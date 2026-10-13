@@ -270,7 +270,7 @@ STEPS: list[Step] = [
     Step("verify.u2", "verify", "Second factor", "verifier", "",
          "u₂ = r · w mod n", "{u2} = {r} · {w} mod {n}", _verify_u2),
     Step("verify.P", "verify", "Rebuild the nonce point", "verifier",
-         "If the signature is honest, u1 · G + u2 · Q is the same point R the signer used, "
+         "If the signature is honest, u₁ · G + u₂ · Q is the same point R the signer used, "
          "because u₁ + u₂ · d = k mod n.",
          "P = u₁ · G + u₂ · Q", "{P} = {u1} · {G} + {u2} · {Q}", _verify_P),
     Step("verify.check", "verify", "Compare with r", "verifier",

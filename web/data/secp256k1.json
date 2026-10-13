@@ -470,7 +470,7 @@
    "section": "verify",
    "title": "Rebuild the nonce point",
    "who": "verifier",
-   "description": "If the signature is honest, u1 · G + u2 · Q is the same point R the signer used, because u₁ + u₂ · d = k mod n.",
+   "description": "If the signature is honest, u₁ · G + u₂ · Q is the same point R the signer used, because u₁ + u₂ · d = k mod n.",
    "formula": "P = u₁ · G + u₂ · Q",
    "worked": "{P} = {u1} · {G} + {u2} · {Q}",
    "status": "done",
