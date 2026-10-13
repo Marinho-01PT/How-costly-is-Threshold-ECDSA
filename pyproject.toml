@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "twoparty"
+version = "0.1.0"
+description = "Two-party ECDSA: implementation and cost measurements (HSG Bachelor project)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["coincurve>=20"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+mta = ["phe"]   # only if the MtA variant uses Paillier; decide with the supervisors
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

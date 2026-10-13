@@ -1,0 +1,22 @@
+# Two parties on one laptop, connected by a Docker network.
+#
+#   docker compose up -d bob
+#   docker compose run --rm alice
+#
+# Add delay to Bob's replies (adds that much to every round trip):
+#   docker compose exec bob tc qdisc replace dev eth0 root netem delay 50ms
+# Remove it again:
+#   docker compose exec bob tc qdisc del dev eth0 root
+services:
+  bob:
+    build: .
+    command: ["--role", "bob", "--listen", "0.0.0.0:5000"]
+    cap_add: [NET_ADMIN]   # needed for tc/netem
+
+  alice:
+    build: .
+    command: ["--role", "alice", "--peer", "bob:5000", "--task", "echo",
+              "--rounds", "200", "--label", "docker", "--out", "benchmark/results/results.csv"]
+    depends_on: [bob]
+    volumes:
+      - ./benchmark/results:/app/benchmark/results
