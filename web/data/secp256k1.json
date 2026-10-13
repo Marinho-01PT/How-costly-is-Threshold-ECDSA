@@ -118,8 +118,8 @@
    "section": "sharing",
    "title": "Pick the first share",
    "who": "dealer",
-   "description": "Instead of one device holding d, it is split into two parts. The first part d1 is a random number. It goes to Alice.",
-   "formula": "d1 ∈ [0, n − 1] at random",
+   "description": "Instead of one device holding d, it is split into two parts. The first part d₁ is a random number. It goes to Alice.",
+   "formula": "d₁ ∈ [0, n − 1] at random",
    "worked": "{d1}",
    "status": "done",
    "inputs": {},
@@ -135,8 +135,8 @@
    "section": "sharing",
    "title": "Compute the second share",
    "who": "dealer",
-   "description": "The second part is whatever is missing to reach d. It goes to Bob. Since d1 is random, d2 on its own also looks random.",
-   "formula": "d2 = d − d1 mod n",
+   "description": "The second part is whatever is missing to reach d. It goes to Bob. Since d₁ is random, d₂ on its own also looks random.",
+   "formula": "d₂ = d − d₁ mod n",
    "worked": "{d2} = {d} − {d1} mod {n}",
    "status": "done",
    "inputs": {
@@ -162,7 +162,7 @@
    "title": "The shares add up to d",
    "who": "both",
    "description": "Only both parts together give back the key. Each part alone fits every possible d.",
-   "formula": "d = d1 + d2 mod n",
+   "formula": "d = d₁ + d₂ mod n",
    "worked": "{d} = {d1} + {d2} mod {n}",
    "status": "done",
    "inputs": {
@@ -187,8 +187,8 @@
    "section": "sharing",
    "title": "Public parts of the shares",
    "who": "both",
-   "description": "Each device can publish d1 · G or d2 · G. They add up to the public key Q, without anyone learning d.",
-   "formula": "Q1 = d1 · G,  Q2 = d2 · G,  Q = Q1 + Q2",
+   "description": "Each device can publish d₁ · G or d₂ · G. They add up to the public key Q, without anyone learning d.",
+   "formula": "Q₁ = d₁ · G,  Q₂ = d₂ · G,  Q = Q₁ + Q₂",
    "worked": "{Q1} + {Q2} = {Q}",
    "status": "done",
    "inputs": {
@@ -419,7 +419,7 @@
    "title": "First factor",
    "who": "verifier",
    "description": "",
-   "formula": "u1 = e · w mod n",
+   "formula": "u₁ = e · w mod n",
    "worked": "{u1} = {e} · {w} mod {n}",
    "status": "done",
    "inputs": {
@@ -445,7 +445,7 @@
    "title": "Second factor",
    "who": "verifier",
    "description": "",
-   "formula": "u2 = r · w mod n",
+   "formula": "u₂ = r · w mod n",
    "worked": "{u2} = {r} · {w} mod {n}",
    "status": "done",
    "inputs": {
@@ -470,8 +470,8 @@
    "section": "verify",
    "title": "Rebuild the nonce point",
    "who": "verifier",
-   "description": "If the signature is honest, u1 · G + u2 · Q is the same point R the signer used, because u1 + u2 · d = k mod n.",
-   "formula": "P = u1 · G + u2 · Q",
+   "description": "If the signature is honest, u1 · G + u2 · Q is the same point R the signer used, because u₁ + u₂ · d = k mod n.",
+   "formula": "P = u₁ · G + u₂ · Q",
    "worked": "{P} = {u1} · {G} + {u2} · {Q}",
    "status": "done",
    "inputs": {
@@ -563,7 +563,7 @@
    "title": "Sign a second message with the same k",
    "who": "signer",
    "description": "A buggy signer uses k again for another message. Both signatures have the same r, so anyone can see that k was reused.",
-   "formula": "s2 = k⁻¹ · (e2 + r · d) mod n",
+   "formula": "s₂ = k⁻¹ · (e₂ + r · d) mod n",
    "worked": "{s2} = {k}⁻¹ · ({e2} + {r} · {d}) mod {n}",
    "status": "done",
    "inputs": {
@@ -596,9 +596,9 @@
    "section": "reuse",
    "title": "Recover the nonce",
    "who": "attacker",
-   "description": "Subtracting the two equations for s removes d. Because of the low-s rule the attacker does not know if s or s2 was flipped, so they try s − s2 and s + s2 with both signs and keep the guess that leads to Q.",
-   "formula": "k = (e − e2) / (s − s2) mod n",
-   "worked": "{k_found} = {variant} mod {n}",
+   "description": "Subtracting the two equations for s removes d. Because of the low-s rule the attacker does not know if s or s₂ was flipped, so they try s − s₂ and s + s₂ with both signs and keep the guess that leads to Q.",
+   "formula": "k = (e − e₂) / (s − s₂) mod n",
+   "worked": "{k_found} = ({e} − {e2}) / ({s} + {s2}) mod {n}",
    "status": "done",
    "inputs": {
     "e": {
@@ -622,10 +622,6 @@
     "k_found": {
      "kind": "int",
      "value": "0x647ef18991362d799c357d722a0b4c4bd5fe7000a806d89342ee320ab82f12b4"
-    },
-    "variant": {
-     "kind": "text",
-     "value": "(e - e2) / (s + s2)"
     }
    }
   },

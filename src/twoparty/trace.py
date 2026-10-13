@@ -186,7 +186,7 @@ def _reuse_k(c, ctx):
     n, e, e2, r = c.n, ctx["e"], ctx["e2"], ctx["sig"].r
     s, s2 = ctx["sig"].s, ctx["sig2"].s
     r_inv = pow(r, -1, n)
-    for op, den in (("-", (s - s2) % n), ("+", (s + s2) % n)):
+    for op, den in (("−", (s - s2) % n), ("+", (s + s2) % n)):
         if den == 0:
             continue
         base = (e - e2) * pow(den, -1, n) % n
@@ -194,8 +194,9 @@ def _reuse_k(c, ctx):
             d_guess = (s * k_guess - e) * r_inv % n
             if c.base_mul(d_guess) == ctx["Q"]:
                 ctx["k_found"], ctx["d_found"], ctx["r_inv"] = k_guess, d_guess, r_inv
-                return ({"e": e, "e2": e2, "s": s, "s2": s2},
-                        {"k_found": k_guess, "variant": f"{'' if sign == 1 else '-'}(e - e2) / (s {op} s2)"})
+                minus = "" if sign == 1 else "−"
+                return ({"e": e, "e2": e2, "s": s, "s2": s2}, {"k_found": k_guess},
+                        "{k_found} = " + minus + "({e} − {e2}) / ({s} " + op + " {s2}) mod {n}")
     raise StepError("no guess matched Q")  # cannot happen for a valid pair
 
 
@@ -222,19 +223,19 @@ STEPS: list[Step] = [
 
     Step("share.d1", "sharing", "Pick the first share", "dealer",
          "Instead of one device holding d, it is split into two parts. "
-         "The first part d1 is a random number. It goes to Alice.",
-         "d1 ∈ [0, n − 1] at random", "{d1}", _share_d1),
+         "The first part d₁ is a random number. It goes to Alice.",
+         "d₁ ∈ [0, n − 1] at random", "{d1}", _share_d1),
     Step("share.d2", "sharing", "Compute the second share", "dealer",
          "The second part is whatever is missing to reach d. It goes to Bob. "
-         "Since d1 is random, d2 on its own also looks random.",
-         "d2 = d − d1 mod n", "{d2} = {d} − {d1} mod {n}", _share_d2),
+         "Since d₁ is random, d₂ on its own also looks random.",
+         "d₂ = d − d₁ mod n", "{d2} = {d} − {d1} mod {n}", _share_d2),
     Step("share.check", "sharing", "The shares add up to d", "both",
          "Only both parts together give back the key. Each part alone fits every possible d.",
-         "d = d1 + d2 mod n", "{d} = {d1} + {d2} mod {n}", _share_check),
+         "d = d₁ + d₂ mod n", "{d} = {d1} + {d2} mod {n}", _share_check),
     Step("share.public", "sharing", "Public parts of the shares", "both",
-         "Each device can publish d1 · G or d2 · G. They add up to the public key Q, "
+         "Each device can publish d₁ · G or d₂ · G. They add up to the public key Q, "
          "without anyone learning d.",
-         "Q1 = d1 · G,  Q2 = d2 · G,  Q = Q1 + Q2", "{Q1} + {Q2} = {Q}", _share_public),
+         "Q₁ = d₁ · G,  Q₂ = d₂ · G,  Q = Q₁ + Q₂", "{Q1} + {Q2} = {Q}", _share_public),
 
     Step("sign.e", "sign", "Hash the message", "signer",
          "Signing works on a number, not on text. The message is hashed with SHA-256 "
@@ -265,13 +266,13 @@ STEPS: list[Step] = [
          "The verifier knows Q, the message and (r, s), but not d or k.",
          "w = s⁻¹ mod n", "{w} = {s}⁻¹ mod {n}", _verify_w),
     Step("verify.u1", "verify", "First factor", "verifier", "",
-         "u1 = e · w mod n", "{u1} = {e} · {w} mod {n}", _verify_u1),
+         "u₁ = e · w mod n", "{u1} = {e} · {w} mod {n}", _verify_u1),
     Step("verify.u2", "verify", "Second factor", "verifier", "",
-         "u2 = r · w mod n", "{u2} = {r} · {w} mod {n}", _verify_u2),
+         "u₂ = r · w mod n", "{u2} = {r} · {w} mod {n}", _verify_u2),
     Step("verify.P", "verify", "Rebuild the nonce point", "verifier",
          "If the signature is honest, u1 · G + u2 · Q is the same point R the signer used, "
-         "because u1 + u2 · d = k mod n.",
-         "P = u1 · G + u2 · Q", "{P} = {u1} · {G} + {u2} · {Q}", _verify_P),
+         "because u₁ + u₂ · d = k mod n.",
+         "P = u₁ · G + u₂ · Q", "{P} = {u1} · {G} + {u2} · {Q}", _verify_P),
     Step("verify.check", "verify", "Compare with r", "verifier",
          "The signature is valid if the x coordinate of P matches r.",
          "x(P) mod n = r", "{x_P} = {r}", _verify_check),
@@ -288,12 +289,12 @@ STEPS: list[Step] = [
     Step("reuse.sig2", "reuse", "Sign a second message with the same k", "signer",
          "A buggy signer uses k again for another message. Both signatures have the same r, "
          "so anyone can see that k was reused.",
-         "s2 = k⁻¹ · (e2 + r · d) mod n", "{s2} = {k}⁻¹ · ({e2} + {r} · {d}) mod {n}", _reuse_sig2),
+         "s₂ = k⁻¹ · (e₂ + r · d) mod n", "{s2} = {k}⁻¹ · ({e2} + {r} · {d}) mod {n}", _reuse_sig2),
     Step("reuse.k", "reuse", "Recover the nonce", "attacker",
          "Subtracting the two equations for s removes d. Because of the low-s rule the attacker "
-         "does not know if s or s2 was flipped, so they try s − s2 and s + s2 with both signs "
+         "does not know if s or s₂ was flipped, so they try s − s₂ and s + s₂ with both signs "
          "and keep the guess that leads to Q.",
-         "k = (e − e2) / (s − s2) mod n", "{k_found} = {variant} mod {n}", _reuse_k),
+         "k = (e − e₂) / (s − s₂) mod n", "{k_found} = (e − e₂) / (s − s₂) mod {n}", _reuse_k),
     Step("reuse.d", "reuse", "Recover the private key", "attacker",
          "With k known, the equation for s has only one unknown left: d.",
          "d = (s · k − e) · r⁻¹ mod n", "{d_found} = ({s} · {k_found} − {e}) · {r}⁻¹ mod {n}", _reuse_d),
@@ -336,12 +337,12 @@ def run_steps(curve: Curve, values: dict) -> list[dict]:
             continue
         if failed:
             out.append({**rec, "status": "blocked", "inputs": {}, "result": {},
-                        "message": f"needs the step '{failed}' to work first"})
+                        "message": "blocked by an earlier error"})
             continue
         try:
             inputs, result, *worked = st.compute(curve, ctx)
         except StepError as exc:
-            failed = st.title
+            failed = True
             out.append({**rec, "status": "error", "inputs": {}, "result": {}, "message": str(exc)})
             continue
         if worked:
@@ -414,10 +415,17 @@ def build_vectors(seed: int = 7) -> dict:
     }
 
 
+_TEMPLATES = {st.id: st.worked for st in STEPS}
+
+
 def _slim(step: dict) -> dict:
-    """Only what the JS has to reproduce: no titles or explanations."""
-    keep = ("id", "status", "inputs", "result", "worked", "message")
-    return {k: step[k] for k in keep if k in step}
+    """Only what the JS has to reproduce: no titles or explanations, and the
+    worked formula only where a step replaced the template."""
+    keep = ("id", "status", "inputs", "result", "message")
+    out = {k: step[k] for k in keep if k in step}
+    if step["worked"] != _TEMPLATES[step["id"]]:
+        out["worked"] = step["worked"]
+    return out
 
 
 def _write(path: Path, data: dict, indent: int | None = 1) -> None:
