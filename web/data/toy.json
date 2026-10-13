@@ -67,6 +67,31 @@
    "title": "What goes wrong if k is reused"
   }
  ],
+ "glossary": {
+  "private key": "The secret number d. Whoever knows it can sign in the owner's name.",
+  "public key": "The point Q = d · G. Everyone may know it; it is used to check signatures.",
+  "point": "A pair of numbers (x, y) that satisfies the curve equation. Points can be added to each other, and adding a point to itself k times is written k · G.",
+  "base point": "A fixed starting point G that everyone agrees on. Every key is a multiple of it.",
+  "mod n": "Arithmetic that wraps around at n, like a clock wraps around at 12. For example 10 + 5 mod 12 = 3.",
+  "share": "One piece of a secret. Each piece alone looks random; only all pieces together give the secret.",
+  "hash": "A fingerprint of a message: a fixed-size number that changes completely if the message changes.",
+  "nonce": "A number used once. In ECDSA it must be random, secret and new for every signature.",
+  "inverse": "The number that undoes a multiplication: k⁻¹ · k = 1 mod n. It plays the role of division.",
+  "x coordinate": "The first of the two numbers that make up a point.",
+  "signature": "The pair (r, s). It proves that the message was signed with the private key that belongs to Q.",
+  "low s": "s and n − s both pass the check. Using only the smaller one makes every signature unique."
+ },
+ "secrets": [
+  "d",
+  "d1",
+  "d2",
+  "k",
+  "k_inv"
+ ],
+ "leaked": [
+  "k_found",
+  "d_found"
+ ],
  "steps": [
   {
    "id": "keygen.d",
@@ -74,6 +99,10 @@
    "title": "Choose the private key",
    "who": "signer",
    "description": "The private key d is a random number between 1 and n - 1. Whoever knows d can sign.",
+   "plain": "Think of d as a password that is never shown to anyone. Because it is picked at random from a huge range, nobody can guess it.",
+   "terms": [
+    "private key"
+   ],
    "formula": "d ∈ [1, n − 1]",
    "worked": "{d}",
    "status": "done",
@@ -91,6 +120,12 @@
    "title": "Compute the public key",
    "who": "signer",
    "description": "Q is d copies of the base point G added together. Going from d to Q is easy, going back from Q to d is the hard problem that keeps the key safe.",
+   "plain": "Q is like a padlock made from the password. Everyone may see the padlock and use it to check signatures, but nobody can work out the password from it.",
+   "terms": [
+    "public key",
+    "point",
+    "base point"
+   ],
    "formula": "Q = d · G",
    "worked": "{Q} = {d} · {G}",
    "status": "done",
@@ -119,6 +154,10 @@
    "title": "Pick the first share",
    "who": "dealer",
    "description": "Instead of one device holding d, it is split into two parts. The first part d₁ is a random number. It goes to Alice.",
+   "plain": "Instead of one device holding the whole password, we tear it into two pieces. Alice gets the first piece, a plain random number.",
+   "terms": [
+    "share"
+   ],
    "formula": "d₁ ∈ [0, n − 1] at random",
    "worked": "{d1}",
    "status": "done",
@@ -136,6 +175,11 @@
    "title": "Compute the second share",
    "who": "dealer",
    "description": "The second part is whatever is missing to reach d. It goes to Bob. Since d₁ is random, d₂ on its own also looks random.",
+   "plain": "Bob gets exactly the piece that is missing. On its own, either piece is just a random number and says nothing about d.",
+   "terms": [
+    "share",
+    "mod n"
+   ],
    "formula": "d₂ = d − d₁ mod n",
    "worked": "{d2} = {d} − {d1} mod {n}",
    "status": "done",
@@ -162,6 +206,11 @@
    "title": "The shares add up to d",
    "who": "both",
    "description": "Only both parts together give back the key. Each part alone fits every possible d.",
+   "plain": "Only both pieces together give back the password. In the two-party protocol this never actually happens: Alice and Bob will sign without putting the pieces together.",
+   "terms": [
+    "share",
+    "mod n"
+   ],
    "formula": "d = d₁ + d₂ mod n",
    "worked": "{d} = {d1} + {d2} mod {n}",
    "status": "done",
@@ -188,6 +237,11 @@
    "title": "Public parts of the shares",
    "who": "both",
    "description": "Each device can publish d₁ · G or d₂ · G. They add up to the public key Q, without anyone learning d.",
+   "plain": "Each piece has its own padlock, and the two padlocks combine into the same public key Q as before. To the outside world nothing has changed.",
+   "terms": [
+    "public key",
+    "point"
+   ],
    "formula": "Q₁ = d₁ · G,  Q₂ = d₂ · G,  Q = Q₁ + Q₂",
    "worked": "{Q1} + {Q2} = {Q}",
    "status": "done",
@@ -225,6 +279,10 @@
    "title": "Hash the message",
    "who": "signer",
    "description": "Signing works on a number, not on text. The message is hashed with SHA-256 and the result is reduced mod n.",
+   "plain": "The message is turned into a fingerprint number. Changing even one letter gives a completely different number.",
+   "terms": [
+    "hash"
+   ],
    "formula": "e = SHA-256(m) mod n",
    "worked": "{e} = SHA-256({m}) mod {n}",
    "status": "done",
@@ -247,6 +305,10 @@
    "title": "Choose a nonce",
    "who": "signer",
    "description": "k is a fresh random number for every signature. It must stay secret and must never be used twice (see the last section).",
+   "plain": "A one-time random number, used for this signature only, like a fresh seal for every letter.",
+   "terms": [
+    "nonce"
+   ],
    "formula": "k ∈ [1, n − 1] at random",
    "worked": "{k}",
    "status": "done",
@@ -264,6 +326,11 @@
    "title": "Compute the nonce point",
    "who": "signer",
    "description": "Same operation as for the public key, now with k.",
+   "plain": "The one-time number gets its own point, the same way the password got its padlock Q.",
+   "terms": [
+    "point",
+    "base point"
+   ],
    "formula": "R = k · G",
    "worked": "{R} = {k} · {G}",
    "status": "done",
@@ -292,6 +359,11 @@
    "title": "Take its x coordinate",
    "who": "signer",
    "description": "The first half of the signature is the x coordinate of R, reduced mod n.",
+   "plain": "Only one coordinate of that point is kept. It becomes the first half of the signature.",
+   "terms": [
+    "x coordinate",
+    "signature"
+   ],
    "formula": "r = x(R) mod n",
    "worked": "{r} = x({R}) mod {n}",
    "status": "done",
@@ -315,6 +387,11 @@
    "title": "Invert the nonce",
    "who": "signer",
    "description": "k⁻¹ is the number that gives 1 when multiplied with k mod n.",
+   "plain": "In this number system there is no ordinary division. Instead we multiply by the inverse, the number that undoes multiplying by k.",
+   "terms": [
+    "inverse",
+    "mod n"
+   ],
    "formula": "k⁻¹ · k = 1 mod n",
    "worked": "{k_inv} · {k} = 1 mod {n}",
    "status": "done",
@@ -337,6 +414,11 @@
    "title": "Compute s",
    "who": "signer",
    "description": "The second half of the signature mixes the hash, r and the private key.",
+   "plain": "This line ties the message, the password and the one-time number together. Only someone who knows d can produce an s that fits.",
+   "terms": [
+    "signature",
+    "mod n"
+   ],
    "formula": "s = k⁻¹ · (e + r · d) mod n",
    "worked": "{s_raw} = {k_inv} · ({e} + {r} · {d}) mod {n}",
    "status": "done",
@@ -371,6 +453,10 @@
    "title": "Use the low form of s",
    "who": "signer",
    "description": "Both s and n − s verify. Bitcoin and libsecp256k1 accept only the smaller one, so if s is above n / 2 it is replaced by n − s.",
+   "plain": "Every signature has a twin that also passes the check. To make signatures unique, the smaller twin is always used.",
+   "terms": [
+    "low s"
+   ],
    "formula": "if s > n / 2:  s = n − s",
    "worked": "{s}",
    "status": "done",
@@ -397,6 +483,11 @@
    "title": "Invert s",
    "who": "verifier",
    "description": "The verifier knows Q, the message and (r, s), but not d or k.",
+   "plain": "Now someone else checks the signature. They only use public things: the message, the signature and the public key.",
+   "terms": [
+    "inverse",
+    "public key"
+   ],
    "formula": "w = s⁻¹ mod n",
    "worked": "{w} = {s}⁻¹ mod {n}",
    "status": "done",
@@ -419,6 +510,11 @@
    "title": "First factor",
    "who": "verifier",
    "description": "",
+   "plain": "The first of two helper numbers, made from the message fingerprint.",
+   "terms": [
+    "hash",
+    "mod n"
+   ],
    "formula": "u₁ = e · w mod n",
    "worked": "{u1} = {e} · {w} mod {n}",
    "status": "done",
@@ -445,6 +541,11 @@
    "title": "Second factor",
    "who": "verifier",
    "description": "",
+   "plain": "The second helper number, made from the first half of the signature.",
+   "terms": [
+    "signature",
+    "mod n"
+   ],
    "formula": "u₂ = r · w mod n",
    "worked": "{u2} = {r} · {w} mod {n}",
    "status": "done",
@@ -471,6 +572,11 @@
    "title": "Rebuild the nonce point",
    "who": "verifier",
    "description": "If the signature is honest, u₁ · G + u₂ · Q is the same point R the signer used, because u₁ + u₂ · d = k mod n.",
+   "plain": "With the helpers and the padlock Q, the checker rebuilds a point. If the signature is honest, it is the same point R the signer made, although the checker never saw k or d.",
+   "terms": [
+    "point",
+    "public key"
+   ],
    "formula": "P = u₁ · G + u₂ · Q",
    "worked": "{P} = {u1} · {G} + {u2} · {Q}",
    "status": "done",
@@ -508,6 +614,11 @@
    "title": "Compare with r",
    "who": "verifier",
    "description": "The signature is valid if the x coordinate of P matches r.",
+   "plain": "If the rebuilt point matches the first half of the signature, the signature is genuine.",
+   "terms": [
+    "x coordinate",
+    "signature"
+   ],
    "formula": "x(P) mod n = r",
    "worked": "{x_P} = {r}",
    "status": "done",
@@ -539,6 +650,10 @@
    "title": "Multiplicative to additive conversion",
    "who": "both",
    "description": "Alice holds a, Bob holds b. MtA turns the product a · b into two shares alpha + beta = a · b mod n without either side learning the other's input. Planned: we are waiting for the description from our supervisors.",
+   "plain": "A way for two people to multiply their secret numbers without showing them to each other. Each one ends up with a piece of the result.",
+   "terms": [
+    "share"
+   ],
    "formula": "",
    "worked": "",
    "status": "planned",
@@ -551,6 +666,11 @@
    "title": "Joint signature",
    "who": "both",
    "description": "Alice and Bob create k together and use MtA for the products of secrets, so they produce a normal (r, s) without ever putting d together. Planned: follows once MtA is in place.",
+   "plain": "Alice and Bob produce one normal signature together. Nobody can tell from the signature that two devices were involved.",
+   "terms": [
+    "signature",
+    "share"
+   ],
    "formula": "",
    "worked": "",
    "status": "planned",
@@ -563,6 +683,10 @@
    "title": "Sign a second message with the same k",
    "who": "signer",
    "description": "A buggy signer uses k again for another message. Both signatures have the same r, so anyone can see that k was reused.",
+   "plain": "The signer makes a mistake: the same one-time number is used for a second message.",
+   "terms": [
+    "nonce"
+   ],
    "formula": "s₂ = k⁻¹ · (e₂ + r · d) mod n",
    "worked": "{s2} = {k}⁻¹ · ({e2} + {r} · {d}) mod {n}",
    "status": "done",
@@ -597,6 +721,11 @@
    "title": "Recover the nonce",
    "who": "attacker",
    "description": "Subtracting the two equations for s removes d. Because of the low-s rule the attacker does not know if s or s₂ was flipped, so they try s − s₂ and s + s₂ with both signs and keep the guess that leads to Q.",
+   "plain": "Two signatures with the same one-time number give two equations with the same unknowns. Like a school algebra problem, the attacker can solve them.",
+   "terms": [
+    "nonce",
+    "low s"
+   ],
    "formula": "k = (e − e₂) / (s − s₂) mod n",
    "worked": "{k_found} = ({e} − {e2}) / ({s} − {s2}) mod {n}",
    "status": "done",
@@ -631,6 +760,10 @@
    "title": "Recover the private key",
    "who": "attacker",
    "description": "With k known, the equation for s has only one unknown left: d.",
+   "plain": "Once k is known, the password follows directly from the formula for s.",
+   "terms": [
+    "private key"
+   ],
    "formula": "d = (s · k − e) · r⁻¹ mod n",
    "worked": "{d_found} = ({s} · {k_found} − {e}) · {r}⁻¹ mod {n}",
    "status": "done",
@@ -665,6 +798,10 @@
    "title": "Check against the public key",
    "who": "attacker",
    "description": "The recovered d gives the public key Q. The key is lost.",
+   "plain": "The attacker checks the result against the public padlock. It fits: they can now sign anything in the owner's name.",
+   "terms": [
+    "public key"
+   ],
    "formula": "d · G = Q",
    "worked": "{d_found} · {G} = {Q_found}",
    "status": "done",

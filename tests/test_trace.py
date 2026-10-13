@@ -8,8 +8,8 @@ from twoparty.ec import CURVES, TOY
 from twoparty.ecdsa_pure import verify
 
 ROOT = Path(__file__).resolve().parents[1]
-STEP_KEYS = {"id", "section", "title", "description", "who", "inputs", "formula",
-             "worked", "result", "status"}
+STEP_KEYS = {"id", "section", "title", "description", "plain", "terms", "who", "inputs",
+             "formula", "worked", "result", "status"}
 
 
 def dec(v):
@@ -121,3 +121,12 @@ def test_committed_files_are_up_to_date(tmp_path):
     for name in CURVES:
         assert (tmp_path / f"{name}.json").read_text() == (ROOT / "web/data" / f"{name}.json").read_text()
     assert (tmp_path / "vectors.json").read_text() == (ROOT / "tests/vectors.json").read_text()
+
+
+def test_plain_words_and_glossary(tr):
+    _, t = tr
+    for s in t["steps"]:
+        assert s["plain"], s["id"]
+        assert s["terms"] and set(s["terms"]) <= t["glossary"].keys(), s["id"]
+    used = {term for s in t["steps"] for term in s["terms"]}
+    assert used == t["glossary"].keys()  # no unused glossary entries

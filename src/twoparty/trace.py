@@ -43,6 +43,30 @@ SECTIONS = [
 ]
 
 
+# Short explanations the page shows next to each step that uses the word.
+GLOSSARY = {
+    "private key": "The secret number d. Whoever knows it can sign in the owner's name.",
+    "public key": "The point Q = d · G. Everyone may know it; it is used to check signatures.",
+    "point": "A pair of numbers (x, y) that satisfies the curve equation. Points can be added "
+             "to each other, and adding a point to itself k times is written k · G.",
+    "base point": "A fixed starting point G that everyone agrees on. Every key is a multiple of it.",
+    "mod n": "Arithmetic that wraps around at n, like a clock wraps around at 12. "
+             "For example 10 + 5 mod 12 = 3.",
+    "share": "One piece of a secret. Each piece alone looks random; only all pieces together give the secret.",
+    "hash": "A fingerprint of a message: a fixed-size number that changes completely if the message changes.",
+    "nonce": "A number used once. In ECDSA it must be random, secret and new for every signature.",
+    "inverse": "The number that undoes a multiplication: k⁻¹ · k = 1 mod n. It plays the role of division.",
+    "x coordinate": "The first of the two numbers that make up a point.",
+    "signature": "The pair (r, s). It proves that the message was signed with the private key that belongs to Q.",
+    "low s": "s and n − s both pass the check. Using only the smaller one makes every signature unique.",
+}
+
+# Values that must stay hidden, and secrets the attacker has recovered.
+# The page marks them.
+SECRETS = ["d", "d1", "d2", "k", "k_inv"]
+LEAKED = ["k_found", "d_found"]
+
+
 @dataclass(frozen=True)
 class Step:
     id: str
@@ -58,6 +82,10 @@ class Step:
     # the third value replaces the worked template. Writes results into ctx.
     # None marks a planned step that is not implemented yet.
     compute: Optional[Callable[[Curve, dict], tuple[dict, dict]]] = None
+    # The same step in everyday words, for readers new to the subject.
+    plain: str = ""
+    # Words from GLOSSARY that this step uses.
+    terms: tuple[str, ...] = ()
 
 
 # ---- step functions ---------------------------------------------------------
@@ -215,92 +243,140 @@ def _reuse_check(c, ctx):
 STEPS: list[Step] = [
     Step("keygen.d", "keygen", "Choose the private key", "signer",
          "The private key d is a random number between 1 and n - 1. Whoever knows d can sign.",
-         "d ∈ [1, n − 1]", "{d}", _keygen_d),
+         "d ∈ [1, n − 1]", "{d}", _keygen_d,
+         plain="Think of d as a password that is never shown to anyone. Because it is picked at random from a huge range, nobody can guess it.",
+         terms=("private key",)),
     Step("keygen.Q", "keygen", "Compute the public key", "signer",
          "Q is d copies of the base point G added together. Going from d to Q is easy, "
          "going back from Q to d is the hard problem that keeps the key safe.",
-         "Q = d · G", "{Q} = {d} · {G}", _keygen_Q),
+         "Q = d · G", "{Q} = {d} · {G}", _keygen_Q,
+         plain="Q is like a padlock made from the password. Everyone may see the padlock and use it to check signatures, but nobody can work out the password from it.",
+         terms=("public key", "point", "base point")),
 
     Step("share.d1", "sharing", "Pick the first share", "dealer",
          "Instead of one device holding d, it is split into two parts. "
          "The first part d₁ is a random number. It goes to Alice.",
-         "d₁ ∈ [0, n − 1] at random", "{d1}", _share_d1),
+         "d₁ ∈ [0, n − 1] at random", "{d1}", _share_d1,
+         plain="Instead of one device holding the whole password, we tear it into two pieces. Alice gets the first piece, a plain random number.",
+         terms=("share",)),
     Step("share.d2", "sharing", "Compute the second share", "dealer",
          "The second part is whatever is missing to reach d. It goes to Bob. "
          "Since d₁ is random, d₂ on its own also looks random.",
-         "d₂ = d − d₁ mod n", "{d2} = {d} − {d1} mod {n}", _share_d2),
+         "d₂ = d − d₁ mod n", "{d2} = {d} − {d1} mod {n}", _share_d2,
+         plain="Bob gets exactly the piece that is missing. On its own, either piece is just a random number and says nothing about d.",
+         terms=("share", "mod n")),
     Step("share.check", "sharing", "The shares add up to d", "both",
          "Only both parts together give back the key. Each part alone fits every possible d.",
-         "d = d₁ + d₂ mod n", "{d} = {d1} + {d2} mod {n}", _share_check),
+         "d = d₁ + d₂ mod n", "{d} = {d1} + {d2} mod {n}", _share_check,
+         plain="Only both pieces together give back the password. In the two-party protocol this never actually happens: Alice and Bob will sign without putting the pieces together.",
+         terms=("share", "mod n")),
     Step("share.public", "sharing", "Public parts of the shares", "both",
          "Each device can publish d₁ · G or d₂ · G. They add up to the public key Q, "
          "without anyone learning d.",
-         "Q₁ = d₁ · G,  Q₂ = d₂ · G,  Q = Q₁ + Q₂", "{Q1} + {Q2} = {Q}", _share_public),
+         "Q₁ = d₁ · G,  Q₂ = d₂ · G,  Q = Q₁ + Q₂", "{Q1} + {Q2} = {Q}", _share_public,
+         plain="Each piece has its own padlock, and the two padlocks combine into the same public key Q as before. To the outside world nothing has changed.",
+         terms=("public key", "point")),
 
     Step("sign.e", "sign", "Hash the message", "signer",
          "Signing works on a number, not on text. The message is hashed with SHA-256 "
          "and the result is reduced mod n.",
-         "e = SHA-256(m) mod n", "{e} = SHA-256({m}) mod {n}", _sign_e),
+         "e = SHA-256(m) mod n", "{e} = SHA-256({m}) mod {n}", _sign_e,
+         plain="The message is turned into a fingerprint number. Changing even one letter gives a completely different number.",
+         terms=("hash",)),
     Step("sign.k", "sign", "Choose a nonce", "signer",
          "k is a fresh random number for every signature. It must stay secret and must "
          "never be used twice (see the last section).",
-         "k ∈ [1, n − 1] at random", "{k}", _sign_k),
+         "k ∈ [1, n − 1] at random", "{k}", _sign_k,
+         plain="A one-time random number, used for this signature only, like a fresh seal for every letter.",
+         terms=("nonce",)),
     Step("sign.R", "sign", "Compute the nonce point", "signer",
          "Same operation as for the public key, now with k.",
-         "R = k · G", "{R} = {k} · {G}", _sign_R),
+         "R = k · G", "{R} = {k} · {G}", _sign_R,
+         plain="The one-time number gets its own point, the same way the password got its padlock Q.",
+         terms=("point", "base point")),
     Step("sign.r", "sign", "Take its x coordinate", "signer",
          "The first half of the signature is the x coordinate of R, reduced mod n.",
-         "r = x(R) mod n", "{r} = x({R}) mod {n}", _sign_r),
+         "r = x(R) mod n", "{r} = x({R}) mod {n}", _sign_r,
+         plain="Only one coordinate of that point is kept. It becomes the first half of the signature.",
+         terms=("x coordinate", "signature")),
     Step("sign.kinv", "sign", "Invert the nonce", "signer",
          "k⁻¹ is the number that gives 1 when multiplied with k mod n.",
-         "k⁻¹ · k = 1 mod n", "{k_inv} · {k} = 1 mod {n}", _sign_kinv),
+         "k⁻¹ · k = 1 mod n", "{k_inv} · {k} = 1 mod {n}", _sign_kinv,
+         plain="In this number system there is no ordinary division. Instead we multiply by the inverse, the number that undoes multiplying by k.",
+         terms=("inverse", "mod n")),
     Step("sign.s", "sign", "Compute s", "signer",
          "The second half of the signature mixes the hash, r and the private key.",
-         "s = k⁻¹ · (e + r · d) mod n", "{s_raw} = {k_inv} · ({e} + {r} · {d}) mod {n}", _sign_s),
+         "s = k⁻¹ · (e + r · d) mod n", "{s_raw} = {k_inv} · ({e} + {r} · {d}) mod {n}", _sign_s,
+         plain="This line ties the message, the password and the one-time number together. Only someone who knows d can produce an s that fits.",
+         terms=("signature", "mod n")),
     Step("sign.lows", "sign", "Use the low form of s", "signer",
          "Both s and n − s verify. Bitcoin and libsecp256k1 accept only the smaller one, "
          "so if s is above n / 2 it is replaced by n − s.",
-         "if s > n / 2:  s = n − s", "{s}", _sign_lows),
+         "if s > n / 2:  s = n − s", "{s}", _sign_lows,
+         plain="Every signature has a twin that also passes the check. To make signatures unique, the smaller twin is always used.",
+         terms=("low s",)),
 
     Step("verify.w", "verify", "Invert s", "verifier",
          "The verifier knows Q, the message and (r, s), but not d or k.",
-         "w = s⁻¹ mod n", "{w} = {s}⁻¹ mod {n}", _verify_w),
+         "w = s⁻¹ mod n", "{w} = {s}⁻¹ mod {n}", _verify_w,
+         plain="Now someone else checks the signature. They only use public things: the message, the signature and the public key.",
+         terms=("inverse", "public key")),
     Step("verify.u1", "verify", "First factor", "verifier", "",
-         "u₁ = e · w mod n", "{u1} = {e} · {w} mod {n}", _verify_u1),
+         "u₁ = e · w mod n", "{u1} = {e} · {w} mod {n}", _verify_u1,
+         plain="The first of two helper numbers, made from the message fingerprint.",
+         terms=("hash", "mod n")),
     Step("verify.u2", "verify", "Second factor", "verifier", "",
-         "u₂ = r · w mod n", "{u2} = {r} · {w} mod {n}", _verify_u2),
+         "u₂ = r · w mod n", "{u2} = {r} · {w} mod {n}", _verify_u2,
+         plain="The second helper number, made from the first half of the signature.",
+         terms=("signature", "mod n")),
     Step("verify.P", "verify", "Rebuild the nonce point", "verifier",
          "If the signature is honest, u₁ · G + u₂ · Q is the same point R the signer used, "
          "because u₁ + u₂ · d = k mod n.",
-         "P = u₁ · G + u₂ · Q", "{P} = {u1} · {G} + {u2} · {Q}", _verify_P),
+         "P = u₁ · G + u₂ · Q", "{P} = {u1} · {G} + {u2} · {Q}", _verify_P,
+         plain="With the helpers and the padlock Q, the checker rebuilds a point. If the signature is honest, it is the same point R the signer made, although the checker never saw k or d.",
+         terms=("point", "public key")),
     Step("verify.check", "verify", "Compare with r", "verifier",
          "The signature is valid if the x coordinate of P matches r.",
-         "x(P) mod n = r", "{x_P} = {r}", _verify_check),
+         "x(P) mod n = r", "{x_P} = {r}", _verify_check,
+         plain="If the rebuilt point matches the first half of the signature, the signature is genuine.",
+         terms=("x coordinate", "signature")),
 
     Step("mta", "mta", "Multiplicative to additive conversion", "both",
          "Alice holds a, Bob holds b. MtA turns the product a · b into two shares "
          "alpha + beta = a · b mod n without either side learning the other's input. "
-         "Planned: we are waiting for the description from our supervisors."),
+         "Planned: we are waiting for the description from our supervisors.",
+         plain="A way for two people to multiply their secret numbers without showing them to each other. Each one ends up with a piece of the result.",
+         terms=("share",)),
     Step("twoparty.sign", "twoparty", "Joint signature", "both",
          "Alice and Bob create k together and use MtA for the products of secrets, "
          "so they produce a normal (r, s) without ever putting d together. "
-         "Planned: follows once MtA is in place."),
+         "Planned: follows once MtA is in place.",
+         plain="Alice and Bob produce one normal signature together. Nobody can tell from the signature that two devices were involved.",
+         terms=("signature", "share")),
 
     Step("reuse.sig2", "reuse", "Sign a second message with the same k", "signer",
          "A buggy signer uses k again for another message. Both signatures have the same r, "
          "so anyone can see that k was reused.",
-         "s₂ = k⁻¹ · (e₂ + r · d) mod n", "{s2} = {k}⁻¹ · ({e2} + {r} · {d}) mod {n}", _reuse_sig2),
+         "s₂ = k⁻¹ · (e₂ + r · d) mod n", "{s2} = {k}⁻¹ · ({e2} + {r} · {d}) mod {n}", _reuse_sig2,
+         plain="The signer makes a mistake: the same one-time number is used for a second message.",
+         terms=("nonce",)),
     Step("reuse.k", "reuse", "Recover the nonce", "attacker",
          "Subtracting the two equations for s removes d. Because of the low-s rule the attacker "
          "does not know if s or s₂ was flipped, so they try s − s₂ and s + s₂ with both signs "
          "and keep the guess that leads to Q.",
-         "k = (e − e₂) / (s − s₂) mod n", "{k_found} = (e − e₂) / (s − s₂) mod {n}", _reuse_k),
+         "k = (e − e₂) / (s − s₂) mod n", "{k_found} = (e − e₂) / (s − s₂) mod {n}", _reuse_k,
+         plain="Two signatures with the same one-time number give two equations with the same unknowns. Like a school algebra problem, the attacker can solve them.",
+         terms=("nonce", "low s")),
     Step("reuse.d", "reuse", "Recover the private key", "attacker",
          "With k known, the equation for s has only one unknown left: d.",
-         "d = (s · k − e) · r⁻¹ mod n", "{d_found} = ({s} · {k_found} − {e}) · {r}⁻¹ mod {n}", _reuse_d),
+         "d = (s · k − e) · r⁻¹ mod n", "{d_found} = ({s} · {k_found} − {e}) · {r}⁻¹ mod {n}", _reuse_d,
+         plain="Once k is known, the password follows directly from the formula for s.",
+         terms=("private key",)),
     Step("reuse.check", "reuse", "Check against the public key", "attacker",
          "The recovered d gives the public key Q. The key is lost.",
-         "d · G = Q", "{d_found} · {G} = {Q_found}", _reuse_check),
+         "d · G = Q", "{d_found} · {G} = {Q_found}", _reuse_check,
+         plain="The attacker checks the result against the public padlock. It fits: they can now sign anything in the owner's name.",
+         terms=("public key",)),
 ]
 
 
@@ -331,7 +407,8 @@ def run_steps(curve: Curve, values: dict) -> list[dict]:
     out, failed = [], None
     for st in STEPS:
         rec = {"id": st.id, "section": st.section, "title": st.title, "who": st.who,
-               "description": st.description, "formula": st.formula, "worked": st.worked}
+               "description": st.description, "plain": st.plain, "terms": list(st.terms),
+               "formula": st.formula, "worked": st.worked}
         if st.compute is None:
             out.append({**rec, "status": "planned", "inputs": {}, "result": {}})
             continue
@@ -366,6 +443,9 @@ def build_trace(curve: Curve, values: dict) -> dict:
         "curve": curve_info(curve),
         "params": {k: encode(v) for k, v in values.items()},
         "sections": SECTIONS,
+        "glossary": GLOSSARY,
+        "secrets": SECRETS,
+        "leaked": LEAKED,
         "steps": run_steps(curve, values),
     }
 

@@ -226,6 +226,7 @@ a { color: var(--accent-dark); }
 }
 .step-card.status-planned { border-style: dashed; border-top-style: solid; border-top-color: var(--muted); }
 .step-card.status-error, .step-card.status-blocked { border-top-color: var(--attacker); }
+.step-card.section-reuse { border-top-color: var(--attacker); }
 .step-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 8px; }
 .step-head h2 { font-size: 1.4rem; }
 .step-head h2:focus { outline: none; }
@@ -299,13 +300,146 @@ button.num:hover { border-style: solid; border-color: var(--accent); }
 .slider { width: 100%; accent-color: var(--accent); min-height: 32px; }
 .guess-out { margin-top: 8px; }
 
+/* ---- icons ---- */
+
+.icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.icon-sm { width: 15px; height: 15px; stroke-width: 2.2; vertical-align: -2px; }
+
+/* ---- big picture ---- */
+
+.big-picture { padding: 8px 0 4px; }
+.big-picture h2 { margin-bottom: 4px; }
+.overview {
+  list-style: none; margin: 10px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
+}
+.overview-card {
+  display: grid; gap: 8px; align-content: start; width: 100%; height: 100%; text-align: left;
+  font: inherit; color: var(--text); background: var(--surface); cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 14px;
+}
+.overview-card:hover { border-color: var(--accent); }
+.overview-icon {
+  display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent-dark);
+}
+@media (prefers-color-scheme: dark) { .overview-icon { color: var(--accent); } }
+.overview-title { font-weight: 700; }
+.overview-body { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 0.85rem; }
+.overview-arrow { color: var(--muted); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px;
+  font-size: 0.82rem; font-weight: 600; white-space: nowrap;
+}
+.pill-secret { background: var(--attacker-soft); color: var(--attacker); }
+.pill-public { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+.pill-alice { background: var(--alice-soft); color: var(--alice); }
+.pill-bob { background: var(--bob-soft); color: var(--bob); }
+
+/* ---- phase bar ---- */
+
+.phases {
+  list-style: none; margin: 0; padding: 0; display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; counter-reset: phase;
+}
+.phase {
+  display: grid; justify-items: center; gap: 4px; width: 100%; height: 100%;
+  font: inherit; font-size: 0.78rem; font-weight: 600; color: var(--muted);
+  background: transparent; border: 0; border-bottom: 3px solid var(--border);
+  padding: 6px 2px 8px; cursor: pointer; border-radius: 6px 6px 0 0;
+}
+.phase:hover { background: var(--surface-2); }
+.phase-done { color: var(--accent-dark); border-bottom-color: var(--accent); }
+.phase-current { color: var(--accent-dark); background: var(--accent-soft); border-bottom-color: var(--accent); }
+@media (prefers-color-scheme: dark) { .phase-done, .phase-current { color: var(--accent); } }
+.phase-planned { border-bottom-style: dashed; }
+.phase-planned:not(.phase-current) { opacity: 0.7; }
+.phase-label { text-align: center; line-height: 1.2; }
+
+/* ---- step card extras ---- */
+
+.plain {
+  background: var(--accent-soft); border-radius: 8px; padding: 12px 14px; margin: 4px 0 12px;
+  font-size: 1.08rem;
+}
+.plain p { margin: 0; }
+.plain .plain-label {
+  font-size: 0.78rem; font-weight: 700; color: var(--accent-dark); margin-bottom: 2px;
+}
+@media (prefers-color-scheme: dark) { .plain .plain-label { color: var(--accent); } }
+.desc { color: var(--muted); }
+.formula-box .eyebrow { margin-top: 4px; }
+.formula-box .formula { margin-top: 2px; }
+
+.values-with-plot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); gap: 20px; align-items: start; }
+
+.lock { display: inline-flex; align-items: center; margin-right: 4px; }
+.lock-secret { color: var(--attacker); }
+.lock-leaked { color: var(--attacker); }
+.lock-legend { margin-top: 12px; }
+
+.terms { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+.terms-title { font-size: 0.85rem; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+.terms-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.term { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); max-width: 100%; }
+.term summary {
+  cursor: pointer; padding: 3px 10px; font-size: 0.88rem; font-weight: 600;
+  color: var(--accent-dark); list-style: none;
+}
+.term summary::-webkit-details-marker { display: none; }
+.term summary::before { content: "+ "; color: var(--muted); }
+.term[open] summary::before { content: "− "; }
+@media (prefers-color-scheme: dark) { .term summary { color: var(--accent); } }
+.term[open] { flex-basis: 100%; background: var(--surface-2); }
+.term p { margin: 0; padding: 0 10px 8px; font-size: 0.92rem; }
+
+/* ---- curve picture ---- */
+
+.plot { margin: 0; }
+.plot-svg { width: 100%; height: auto; display: block; background: var(--surface-2); border-radius: 8px; }
+.plot-frame { fill: none; stroke: var(--border); }
+.plot-axis { font: 10px var(--mono); fill: var(--muted); }
+.plot-dots circle { fill: var(--muted); opacity: 0.45; }
+.plot-mark .plot-ring { fill: none; stroke: var(--text); stroke-width: 1.6; }
+.plot-mark .plot-core { fill: var(--text); }
+.plot-result .plot-ring { stroke: var(--accent); stroke-width: 2.4; }
+.plot-result .plot-core { fill: var(--accent); }
+.plot-alice .plot-ring { stroke: var(--alice); } .plot-alice .plot-core { fill: var(--alice); }
+.plot-bob .plot-ring { stroke: var(--bob); } .plot-bob .plot-core { fill: var(--bob); }
+.plot-label {
+  font: 700 13px var(--sans); fill: var(--text);
+  paint-order: stroke; stroke: var(--surface-2); stroke-width: 4px; stroke-linejoin: round;
+}
+.plot figcaption { margin-top: 8px; }
+.plot-legend { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 2px; font-size: 0.88rem; }
+.plot-key { display: flex; align-items: center; gap: 6px; font-family: var(--mono); }
+.plot-swatch { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--text); flex: none; }
+.plot-key.plot-result .plot-swatch { background: var(--accent); border-color: var(--accent); }
+.plot-key.plot-alice .plot-swatch { background: var(--alice); border-color: var(--alice); }
+.plot-key.plot-bob .plot-swatch { background: var(--bob); border-color: var(--bob); }
+.plot-role { font-family: var(--sans); color: var(--muted); }
+.plot-note { background: var(--surface-2); border-radius: 8px; padding: 12px 14px; font-size: 0.92rem; }
+.plot-note p { margin: 0; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .plot-result .plot-ring { animation: pop 450ms ease-out; transform-box: fill-box; transform-origin: center; }
+  @keyframes pop { from { transform: scale(2.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+}
+
 /* ---- footer ---- */
 
 .site-footer { border-top: 1px solid var(--border); padding: 20px 0 32px; color: var(--muted); }
 
 /* ---- small screens ---- */
 
+@media (max-width: 1000px) {
+  .values-with-plot { grid-template-columns: minmax(0, 1fr); }
+  .values-with-plot .plot { max-width: 380px; }
+}
 @media (max-width: 860px) {
+  .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .layout { grid-template-columns: minmax(0, 1fr); }
   .sidebar {
     position: static; max-height: none; background: var(--surface);
@@ -314,6 +448,11 @@ button.num:hover { border-style: solid; border-color: var(--accent); }
 }
 @media (max-width: 560px) {
   h1 { font-size: 1.35rem; }
+  .overview { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .overview-card { grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; row-gap: 6px; padding: 10px 12px; }
+  .overview-icon { grid-row: span 2; width: 32px; height: 32px; }
+  .phases { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .phase .icon { width: 18px; height: 18px; }
   .values-grid, .share-grid { grid-template-columns: minmax(0, 1fr); }
   .step-card { padding: 16px; }
   .formula { font-size: 1.05rem; }

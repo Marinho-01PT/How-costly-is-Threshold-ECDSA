@@ -37,6 +37,16 @@
       <div id="curve-info" class="curve-info"></div>
     </section>
 
+    <section class="big-picture" aria-labelledby="overview-title">
+      <h2 id="overview-title">The big picture</h2>
+      <p class="small">
+        ECDSA lets someone sign a message so that everyone can check it, without revealing the
+        secret used to sign. Our project adds step 2: the secret is split between two devices.
+        Select a box to jump there.
+      </p>
+      <div id="overview"></div>
+    </section>
+
     <div class="layout">
       <nav class="sidebar" aria-label="Steps">
         <details class="nav-details" open>
@@ -46,14 +56,7 @@
       </nav>
 
       <div class="content">
-        <section class="panel" aria-labelledby="editor-title">
-          <div class="panel-head">
-            <h2 id="editor-title">Your numbers</h2>
-            <span id="source" class="source" data-kind="python">Values from Python</span>
-          </div>
-          <div id="editor"></div>
-        </section>
-
+        <nav id="phases" aria-label="Phases"></nav>
         <div class="stepper">
           <button type="button" id="prev" class="btn">Previous</button>
           <p id="counter" class="counter" aria-live="polite"></p>
@@ -61,6 +64,14 @@
         </div>
         <div id="step" class="step" tabindex="-1"></div>
         <p class="small kbd-hint">Tip: the left and right arrow keys also move between steps.</p>
+
+        <section class="panel" aria-labelledby="editor-title">
+          <div class="panel-head">
+            <h2 id="editor-title">Try your own numbers</h2>
+            <span id="source" class="source" data-kind="python">Values from Python</span>
+          </div>
+          <div id="editor"></div>
+        </section>
 
         <section class="panel" aria-labelledby="sharing-title">
           <div class="panel-head">

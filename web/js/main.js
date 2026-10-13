@@ -3,6 +3,8 @@
 
 import { Curve } from "./ec.js";
 import { el, label, owner, valueNode, workedNode } from "./format.js";
+import { icon, SECTION_ICONS } from "./icons.js";
+import { renderPlot } from "./plot.js";
 import { renderSharing } from "./sharing.js";
 import { runSteps } from "./steps.js";
 
@@ -11,6 +13,12 @@ const EDITABLE = ["d", "d1", "k", "e", "e2"];
 const WHO = {
   signer: "Signer", verifier: "Verifier", dealer: "Key setup", attacker: "Attacker",
   both: "Alice and Bob", alice: "Alice", bob: "Bob",
+};
+
+// Short names for the phase bar.
+const PHASE = {
+  keygen: "Keys", sharing: "Split", sign: "Sign", verify: "Verify",
+  mta: "MtA", twoparty: "Sign together", reuse: "Attack",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -71,6 +79,7 @@ function renderAll() {
     b.setAttribute("aria-pressed", String(b.dataset.curve === state.curve)));
   renderCurveInfo();
   renderEditor();
+  renderOverview();
   renderNav();
   renderStep();
   renderSharing($("sharing"), state.curves[state.curve], info(), state.edited ?? pythonValues());
@@ -178,17 +187,93 @@ function renderNav() {
   $("nav").replaceChildren(list);
 }
 
+// The big picture at the top: four boxes, each one jumps to its section.
+function renderOverview() {
+  const box = (section, title, body) => el("li", {},
+    el("button", { type: "button", class: "overview-card", onclick: () => goSection(section) },
+      el("span", { class: "overview-icon" }, icon(SECTION_ICONS[section])),
+      el("span", { class: "overview-title" }, title),
+      el("span", { class: "overview-body" }, body)));
+  const secret = (t) => el("span", { class: "pill pill-secret" }, icon("lock", "icon icon-sm"), t);
+  const pub = (t) => el("span", { class: "pill pill-public" }, t);
+  const who = (w, t) => el("span", { class: `pill pill-${w}` }, t);
+  const arrow = () => icon("arrow", "icon icon-sm overview-arrow");
+  $("overview").replaceChildren(el("ol", { class: "overview" },
+    box("keygen", "1. Make a key pair",
+      [secret("private key d"), arrow(), pub("public key Q")]),
+    box("sharing", "2. Split the private key",
+      [secret("d"), arrow(), who("alice", "d₁ for Alice"), who("bob", "d₂ for Bob")]),
+    box("sign", "3. Sign a message",
+      [pub("message"), " + ", secret("d"), arrow(), pub("signature (r, s)")]),
+    box("verify", "4. Check the signature",
+      [pub("message"), " + ", pub("(r, s)"), " + ", pub("Q"), arrow(), pub("valid?")]),
+  ));
+}
+
+function renderPhases(current) {
+  const sections = trace().sections;
+  const at = sections.findIndex((x) => x.id === current);
+  $("phases").replaceChildren(el("ol", { class: "phases" }, sections.map((sec, i) => {
+    const planned = trace().steps.filter((s) => s.section === sec.id).every((s) => s.status === "planned");
+    const cls = ["phase", i === at && "phase-current", i < at && "phase-done", planned && "phase-planned"]
+      .filter(Boolean).join(" ");
+    return el("li", {}, el("button", {
+      type: "button", class: cls, "aria-current": i === at ? "step" : null,
+      title: sec.title, onclick: () => goSection(sec.id),
+    }, icon(SECTION_ICONS[sec.id] ?? "arrow"), el("span", { class: "phase-label" }, PHASE[sec.id] ?? sec.title),
+    planned ? el("span", { class: "visually-hidden" }, " (planned)") : null));
+  })));
+}
+
+function goSection(id) {
+  const i = trace().steps.findIndex((s) => s.section === id);
+  if (i >= 0) go(i, true);
+}
+
 const statusText = (s) => ({ planned: "planned", error: "error", blocked: "blocked" }[s] ?? s);
+
+function secrecy(name) {
+  if (trace().secrets.includes(name)) return "secret";
+  if (trace().leaked.includes(name)) return "leaked";
+  return null;
+}
 
 function valueTable(caption, values, c) {
   const entries = Object.entries(values);
   if (!entries.length) return null;
   return el("div", { class: "values" },
     el("h3", { class: "sub" }, caption),
-    el("dl", {}, entries.flatMap(([name, v]) => [
-      el("dt", { class: owner(name) ? `who-${owner(name)}` : null }, label(name)),
-      el("dd", {}, valueNode(v, c, owner(name), true)),
-    ])));
+    el("dl", {}, entries.flatMap(([name, v]) => {
+      const sec = secrecy(name);
+      return [
+        el("dt", { class: owner(name) ? `who-${owner(name)}` : null },
+          sec ? el("span", { class: `lock lock-${sec}`, title: sec === "secret" ? "Secret" : "Leaked secret" },
+            icon(sec === "secret" ? "lock" : "unlock", "icon icon-sm"),
+            el("span", { class: "visually-hidden" }, sec === "secret" ? "secret: " : "leaked secret: ")) : null,
+          label(name)),
+        el("dd", {}, valueNode(v, c, owner(name), true)),
+      ];
+    })));
+}
+
+function legend(s) {
+  const names = [...Object.keys(s.inputs), ...Object.keys(s.result)];
+  const kinds = new Set(names.map(secrecy).filter(Boolean));
+  if (!kinds.size) return null;
+  return el("p", { class: "lock-legend small" },
+    kinds.has("secret") ? el("span", {}, el("span", { class: "lock lock-secret" }, icon("lock", "icon icon-sm")),
+      " secret: never leaves its owner. ") : null,
+    kinds.has("leaked") ? el("span", {}, el("span", { class: "lock lock-leaked" }, icon("unlock", "icon icon-sm")),
+      " leaked: a secret the attacker has worked out.") : null);
+}
+
+function glossary(s) {
+  if (!s.terms?.length) return null;
+  const g = trace().glossary;
+  return el("div", { class: "terms" },
+    el("p", { class: "terms-title" }, "Words in this step"),
+    el("div", { class: "terms-list" }, s.terms.map((t) =>
+      el("details", { class: "term" }, el("summary", {}, t), el("p", {}, g[t])))));
 }
 
 function renderStep() {
@@ -205,12 +290,21 @@ function renderStep() {
       el("p", {}, el("strong", {}, "Not implemented yet. "),
         "This step is a placeholder. It will follow the protocol description from our supervisors.")));
   } else {
-    if (s.formula) body.push(el("p", { class: "formula", "aria-label": `Formula: ${s.formula}` }, s.formula));
+    if (s.formula) {
+      body.push(el("div", { class: "formula-box" },
+        el("p", { class: "eyebrow" }, "The formula"),
+        el("p", { class: "formula", "aria-label": `Formula: ${s.formula}` }, s.formula)));
+    }
     if (s.status === "done") {
       body.push(el("div", { class: "worked-box" },
         el("p", { class: "eyebrow" }, "With the numbers"), workedNode(s.worked, lookup, c)));
-      body.push(el("div", { class: "values-grid" },
-        valueTable("Inputs", s.inputs, c), valueTable("Result", s.result, c)));
+      const plot = renderPlot(state.curves[state.curve], c, s);
+      body.push(el("div", { class: plot ? "values-with-plot" : "" },
+        el("div", {},
+          el("div", { class: "values-grid" },
+            valueTable("Goes in", s.inputs, c), valueTable("Comes out", s.result, c)),
+          legend(s)),
+        plot));
     } else {
       body.push(el("div", { class: `msg msg-${s.status === "error" ? "error" : "planned"}` },
         el("p", {}, s.status === "error" ? "This step does not work with these values: " : "",
@@ -218,13 +312,17 @@ function renderStep() {
     }
   }
 
-  $("step").replaceChildren(el("article", { class: `step-card status-${s.status}` },
+  $("step").replaceChildren(el("article", { class: `step-card status-${s.status} section-${s.section}` },
     el("p", { class: "eyebrow" }, sec?.title ?? ""),
     el("div", { class: "step-head" },
       el("h2", { id: "step-title", tabindex: "-1" }, s.title),
       el("span", { class: `who who-${s.who}` }, WHO[s.who] ?? s.who)),
+    s.plain ? el("div", { class: "plain" },
+      el("p", { class: "plain-label" }, "In plain words"), el("p", {}, s.plain)) : null,
     s.description ? el("p", { class: "desc" }, s.description) : null,
-    body));
+    body,
+    glossary(s)));
+  renderPhases(s.section);
 
   $("counter").textContent = `Step ${state.index + 1} of ${all.length}`;
   $("prev").disabled = state.index === 0;
