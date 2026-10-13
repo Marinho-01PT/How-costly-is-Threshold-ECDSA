@@ -1,0 +1,704 @@
+{
+ "schema": 1,
+ "generated_by": "python -m twoparty.trace",
+ "note": "Demo values, not secret. Educational code, not constant-time.",
+ "curve": {
+  "name": "secp256k1",
+  "p": "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+  "a": "0x0",
+  "b": "0x7",
+  "G": {
+   "kind": "point",
+   "x": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+   "y": "0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+  },
+  "n": "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",
+  "bits": 256
+ },
+ "params": {
+  "d": {
+   "kind": "int",
+   "value": "0x1e2feb89414c343c1027c4d1c386bbc4cd613e30d8f16adf91b7584a2265b1f6"
+  },
+  "d1": {
+   "kind": "int",
+   "value": "0x35bf992dc9e9c616612e7696a6cecc1b78e510617311d8a3c2ce6f447ed4d57c"
+  },
+  "k": {
+   "kind": "int",
+   "value": "0x9b810e766ec9d28663ca828dd5f4b3b2e4b06ce60741c7a87ce42c8218072e8d"
+  },
+  "message": {
+   "kind": "text",
+   "value": "hello"
+  },
+  "e2": {
+   "kind": "int",
+   "value": "0x3908c567feda72bc0dbdb2dff040fe0d3470dcd51b942374378a476930dbf6b3"
+  }
+ },
+ "sections": [
+  {
+   "id": "keygen",
+   "title": "Key generation"
+  },
+  {
+   "id": "sharing",
+   "title": "Splitting the key"
+  },
+  {
+   "id": "sign",
+   "title": "Signing on one device"
+  },
+  {
+   "id": "verify",
+   "title": "Verification"
+  },
+  {
+   "id": "mta",
+   "title": "Multiplicative to additive (MtA)"
+  },
+  {
+   "id": "twoparty",
+   "title": "Signing with two devices"
+  },
+  {
+   "id": "reuse",
+   "title": "What goes wrong if k is reused"
+  }
+ ],
+ "steps": [
+  {
+   "id": "keygen.d",
+   "section": "keygen",
+   "title": "Choose the private key",
+   "who": "signer",
+   "description": "The private key d is a random number between 1 and n - 1. Whoever knows d can sign.",
+   "formula": "d ∈ [1, n − 1]",
+   "worked": "{d}",
+   "status": "done",
+   "inputs": {},
+   "result": {
+    "d": {
+     "kind": "int",
+     "value": "0x1e2feb89414c343c1027c4d1c386bbc4cd613e30d8f16adf91b7584a2265b1f6"
+    }
+   }
+  },
+  {
+   "id": "keygen.Q",
+   "section": "keygen",
+   "title": "Compute the public key",
+   "who": "signer",
+   "description": "Q is d copies of the base point G added together. Going from d to Q is easy, going back from Q to d is the hard problem that keeps the key safe.",
+   "formula": "Q = d · G",
+   "worked": "{Q} = {d} · {G}",
+   "status": "done",
+   "inputs": {
+    "d": {
+     "kind": "int",
+     "value": "0x1e2feb89414c343c1027c4d1c386bbc4cd613e30d8f16adf91b7584a2265b1f6"
+    },
+    "G": {
+     "kind": "point",
+     "x": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+     "y": "0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+    }
+   },
+   "result": {
+    "Q": {
+     "kind": "point",
+     "x": "0xd7da18e28d6463ea9b7e93402aec0e122b76a669e04ad12f5f4b913f772751ef",
+     "y": "0x30b2258b85b729c8df9dda0cd1a5aa20ead6e416644fc6e75fbc327be89ead17"
+    }
+   }
+  },
+  {
+   "id": "share.d1",
+   "section": "sharing",
+   "title": "Pick the first share",
+   "who": "dealer",
+   "description": "Instead of one device holding d, it is split into two parts. The first part d1 is a random number. It goes to Alice.",
+   "formula": "d1 ∈ [0, n − 1] at random",
+   "worked": "{d1}",
+   "status": "done",
+   "inputs": {},
+   "result": {
+    "d1": {
+     "kind": "int",
+     "value": "0x35bf992dc9e9c616612e7696a6cecc1b78e510617311d8a3c2ce6f447ed4d57c"
+    }
+   }
+  },
+  {
+   "id": "share.d2",
+   "section": "sharing",
+   "title": "Compute the second share",
+   "who": "dealer",
+   "description": "The second part is whatever is missing to reach d. It goes to Bob. Since d1 is random, d2 on its own also looks random.",
+   "formula": "d2 = d − d1 mod n",
+   "worked": "{d2} = {d} − {d1} mod {n}",
+   "status": "done",
+   "inputs": {
+    "d": {
+     "kind": "int",
+     "value": "0x1e2feb89414c343c1027c4d1c386bbc4cd613e30d8f16adf91b7584a2265b1f6"
+    },
+    "d1": {
+     "kind": "int",
+     "value": "0x35bf992dc9e9c616612e7696a6cecc1b78e510617311d8a3c2ce6f447ed4d57c"
+    }
+   },
+   "result": {
+    "d2": {
+     "kind": "int",
+     "value": "0xe870525b77626e25aef94e3b1cb7efa80f2b0ab6152832778ebb479273c71dbb"
+    }
+   }
+  },
+  {
+   "id": "share.check",
+   "section": "sharing",
+   "title": "The shares add up to d",
+   "who": "both",
+   "description": "Only both parts together give back the key. Each part alone fits every possible d.",
+   "formula": "d = d1 + d2 mod n",
+   "worked": "{d} = {d1} + {d2} mod {n}",
+   "status": "done",
+   "inputs": {
+    "d1": {
+     "kind": "int",
+     "value": "0x35bf992dc9e9c616612e7696a6cecc1b78e510617311d8a3c2ce6f447ed4d57c"
+    },
+    "d2": {
+     "kind": "int",
+     "value": "0xe870525b77626e25aef94e3b1cb7efa80f2b0ab6152832778ebb479273c71dbb"
+    }
+   },
+   "result": {
+    "d": {
+     "kind": "int",
+     "value": "0x1e2feb89414c343c1027c4d1c386bbc4cd613e30d8f16adf91b7584a2265b1f6"
+    }
+   }
+  },
+  {
+   "id": "share.public",
+   "section": "sharing",
+   "title": "Public parts of the shares",
+   "who": "both",
+   "description": "Each device can publish d1 · G or d2 · G. They add up to the public key Q, without anyone learning d.",
+   "formula": "Q1 = d1 · G,  Q2 = d2 · G,  Q = Q1 + Q2",
+   "worked": "{Q1} + {Q2} = {Q}",
+   "status": "done",
+   "inputs": {
+    "d1": {
+     "kind": "int",
+     "value": "0x35bf992dc9e9c616612e7696a6cecc1b78e510617311d8a3c2ce6f447ed4d57c"
+    },
+    "d2": {
+     "kind": "int",
+     "value": "0xe870525b77626e25aef94e3b1cb7efa80f2b0ab6152832778ebb479273c71dbb"
+    }
+   },
+   "result": {
+    "Q1": {
+     "kind": "point",
+     "x": "0xd2020fd50dab8bcff20124c0c6d05b9bd755da32f79d635b76827eae95f109be",
+     "y": "0x9ef79c6755ea3fe3ec0dfe43c2b7f56231d1e09121b6ae26f2ffeb8c54d730ae"
+    },
+    "Q2": {
+     "kind": "point",
+     "x": "0x90a26804800e3093284cdf0804f44673bca87d6601192ba489436141c2d4a594",
+     "y": "0x64d0de484f2c58915fbb27c3366b494c32a285e1ca112a0621792b6713f94b96"
+    },
+    "Q": {
+     "kind": "point",
+     "x": "0xd7da18e28d6463ea9b7e93402aec0e122b76a669e04ad12f5f4b913f772751ef",
+     "y": "0x30b2258b85b729c8df9dda0cd1a5aa20ead6e416644fc6e75fbc327be89ead17"
+    }
+   }
+  },
+  {
+   "id": "sign.e",
+   "section": "sign",
+   "title": "Hash the message",
+   "who": "signer",
+   "description": "Signing works on a number, not on text. The message is hashed with SHA-256 and the result is reduced mod n.",
+   "formula": "e = SHA-256(m) mod n",
+   "worked": "{e} = SHA-256({m}) mod {n}",
+   "status": "done",
+   "inputs": {
+    "m": {
+     "kind": "text",
+     "value": "hello"
+    }
+   },
+   "result": {
+    "e": {
+     "kind": "int",
+     "value": "0x2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    }
+   }
+  },
+  {
+   "id": "sign.k",
+   "section": "sign",
+   "title": "Choose a nonce",
+   "who": "signer",
+   "description": "k is a fresh random number for every signature. It must stay secret and must never be used twice (see the last section).",
+   "formula": "k ∈ [1, n − 1] at random",
+   "worked": "{k}",
+   "status": "done",
+   "inputs": {},
+   "result": {
+    "k": {
+     "kind": "int",
+     "value": "0x9b810e766ec9d28663ca828dd5f4b3b2e4b06ce60741c7a87ce42c8218072e8d"
+    }
+   }
+  },
+  {
+   "id": "sign.R",
+   "section": "sign",
+   "title": "Compute the nonce point",
+   "who": "signer",
+   "description": "Same operation as for the public key, now with k.",
+   "formula": "R = k · G",
+   "worked": "{R} = {k} · {G}",
+   "status": "done",
+   "inputs": {
+    "k": {
+     "kind": "int",
+     "value": "0x9b810e766ec9d28663ca828dd5f4b3b2e4b06ce60741c7a87ce42c8218072e8d"
+    },
+    "G": {
+     "kind": "point",
+     "x": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+     "y": "0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+    }
+   },
+   "result": {
+    "R": {
+     "kind": "point",
+     "x": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640",
+     "y": "0xfb6005e4202d711c23b1381d7a31e0a742982b772d4ea195060155e65bf1fac2"
+    }
+   }
+  },
+  {
+   "id": "sign.r",
+   "section": "sign",
+   "title": "Take its x coordinate",
+   "who": "signer",
+   "description": "The first half of the signature is the x coordinate of R, reduced mod n.",
+   "formula": "r = x(R) mod n",
+   "worked": "{r} = x({R}) mod {n}",
+   "status": "done",
+   "inputs": {
+    "R": {
+     "kind": "point",
+     "x": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640",
+     "y": "0xfb6005e4202d711c23b1381d7a31e0a742982b772d4ea195060155e65bf1fac2"
+    }
+   },
+   "result": {
+    "r": {
+     "kind": "int",
+     "value": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640"
+    }
+   }
+  },
+  {
+   "id": "sign.kinv",
+   "section": "sign",
+   "title": "Invert the nonce",
+   "who": "signer",
+   "description": "k⁻¹ is the number that gives 1 when multiplied with k mod n.",
+   "formula": "k⁻¹ · k = 1 mod n",
+   "worked": "{k_inv} · {k} = 1 mod {n}",
+   "status": "done",
+   "inputs": {
+    "k": {
+     "kind": "int",
+     "value": "0x9b810e766ec9d28663ca828dd5f4b3b2e4b06ce60741c7a87ce42c8218072e8d"
+    }
+   },
+   "result": {
+    "k_inv": {
+     "kind": "int",
+     "value": "0x1260dbb73aedd157c8733d5ef43cb61a0faf1a6dd640183c68a5d8112295b5e2"
+    }
+   }
+  },
+  {
+   "id": "sign.s",
+   "section": "sign",
+   "title": "Compute s",
+   "who": "signer",
+   "description": "The second half of the signature mixes the hash, r and the private key.",
+   "formula": "s = k⁻¹ · (e + r · d) mod n",
+   "worked": "{s_raw} = {k_inv} · ({e} + {r} · {d}) mod {n}",
+   "status": "done",
+   "inputs": {
+    "k_inv": {
+     "kind": "int",
+     "value": "0x1260dbb73aedd157c8733d5ef43cb61a0faf1a6dd640183c68a5d8112295b5e2"
+    },
+    "e": {
+     "kind": "int",
+     "value": "0x2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    },
+    "r": {
+     "kind": "int",
+     "value": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640"
+    },
+    "d": {
+     "kind": "int",
+     "value": "0x1e2feb89414c343c1027c4d1c386bbc4cd613e30d8f16adf91b7584a2265b1f6"
+    }
+   },
+   "result": {
+    "s_raw": {
+     "kind": "int",
+     "value": "0xe62944d002cd3bba9aa595f4fb912d7152088ea007fcf6fd6db087c8df594ffd"
+    }
+   }
+  },
+  {
+   "id": "sign.lows",
+   "section": "sign",
+   "title": "Use the low form of s",
+   "who": "signer",
+   "description": "Both s and n − s verify. Bitcoin and libsecp256k1 accept only the smaller one, so if s is above n / 2 it is replaced by n − s.",
+   "formula": "if s > n / 2:  s = n − s",
+   "worked": "{s}",
+   "status": "done",
+   "inputs": {
+    "s_raw": {
+     "kind": "int",
+     "value": "0xe62944d002cd3bba9aa595f4fb912d7152088ea007fcf6fd6db087c8df594ffd"
+    }
+   },
+   "result": {
+    "s": {
+     "kind": "int",
+     "value": "0x19d6bb2ffd32c445655a6a0b046ed28d68a64e46a74ba93e5221d6c3f0dcf144"
+    },
+    "flipped": {
+     "kind": "bool",
+     "value": true
+    }
+   }
+  },
+  {
+   "id": "verify.w",
+   "section": "verify",
+   "title": "Invert s",
+   "who": "verifier",
+   "description": "The verifier knows Q, the message and (r, s), but not d or k.",
+   "formula": "w = s⁻¹ mod n",
+   "worked": "{w} = {s}⁻¹ mod {n}",
+   "status": "done",
+   "inputs": {
+    "s": {
+     "kind": "int",
+     "value": "0x19d6bb2ffd32c445655a6a0b046ed28d68a64e46a74ba93e5221d6c3f0dcf144"
+    }
+   },
+   "result": {
+    "w": {
+     "kind": "int",
+     "value": "0xdc5ef00beb61633dad7a6fafc0cd2262ad5f8fd3e3bb716a44eaee0edfa1b853"
+    }
+   }
+  },
+  {
+   "id": "verify.u1",
+   "section": "verify",
+   "title": "First factor",
+   "who": "verifier",
+   "description": "",
+   "formula": "u1 = e · w mod n",
+   "worked": "{u1} = {e} · {w} mod {n}",
+   "status": "done",
+   "inputs": {
+    "e": {
+     "kind": "int",
+     "value": "0x2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    },
+    "w": {
+     "kind": "int",
+     "value": "0xdc5ef00beb61633dad7a6fafc0cd2262ad5f8fd3e3bb716a44eaee0edfa1b853"
+    }
+   },
+   "result": {
+    "u1": {
+     "kind": "int",
+     "value": "0x549de1a3fba72cbc1341861615264f07e4e8787b13c771db3e30130a5703f0f0"
+    }
+   }
+  },
+  {
+   "id": "verify.u2",
+   "section": "verify",
+   "title": "Second factor",
+   "who": "verifier",
+   "description": "",
+   "formula": "u2 = r · w mod n",
+   "worked": "{u2} = {r} · {w} mod {n}",
+   "status": "done",
+   "inputs": {
+    "r": {
+     "kind": "int",
+     "value": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640"
+    },
+    "w": {
+     "kind": "int",
+     "value": "0xdc5ef00beb61633dad7a6fafc0cd2262ad5f8fd3e3bb716a44eaee0edfa1b853"
+    }
+   },
+   "result": {
+    "u2": {
+     "kind": "int",
+     "value": "0xc0def1722d110e3f736d7e464efdc9e2d63c828deccc6c0be6ef8126b66b3d30"
+    }
+   }
+  },
+  {
+   "id": "verify.P",
+   "section": "verify",
+   "title": "Rebuild the nonce point",
+   "who": "verifier",
+   "description": "If the signature is honest, u1 · G + u2 · Q is the same point R the signer used, because u1 + u2 · d = k mod n.",
+   "formula": "P = u1 · G + u2 · Q",
+   "worked": "{P} = {u1} · {G} + {u2} · {Q}",
+   "status": "done",
+   "inputs": {
+    "u1": {
+     "kind": "int",
+     "value": "0x549de1a3fba72cbc1341861615264f07e4e8787b13c771db3e30130a5703f0f0"
+    },
+    "u2": {
+     "kind": "int",
+     "value": "0xc0def1722d110e3f736d7e464efdc9e2d63c828deccc6c0be6ef8126b66b3d30"
+    },
+    "G": {
+     "kind": "point",
+     "x": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+     "y": "0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+    },
+    "Q": {
+     "kind": "point",
+     "x": "0xd7da18e28d6463ea9b7e93402aec0e122b76a669e04ad12f5f4b913f772751ef",
+     "y": "0x30b2258b85b729c8df9dda0cd1a5aa20ead6e416644fc6e75fbc327be89ead17"
+    }
+   },
+   "result": {
+    "P": {
+     "kind": "point",
+     "x": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640",
+     "y": "0x49ffa1bdfd28ee3dc4ec7e285ce1f58bd67d488d2b15e6af9feaa18a40e016d"
+    }
+   }
+  },
+  {
+   "id": "verify.check",
+   "section": "verify",
+   "title": "Compare with r",
+   "who": "verifier",
+   "description": "The signature is valid if the x coordinate of P matches r.",
+   "formula": "x(P) mod n = r",
+   "worked": "{x_P} = {r}",
+   "status": "done",
+   "inputs": {
+    "P": {
+     "kind": "point",
+     "x": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640",
+     "y": "0x49ffa1bdfd28ee3dc4ec7e285ce1f58bd67d488d2b15e6af9feaa18a40e016d"
+    },
+    "r": {
+     "kind": "int",
+     "value": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640"
+    }
+   },
+   "result": {
+    "x_P": {
+     "kind": "int",
+     "value": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640"
+    },
+    "valid": {
+     "kind": "bool",
+     "value": true
+    }
+   }
+  },
+  {
+   "id": "mta",
+   "section": "mta",
+   "title": "Multiplicative to additive conversion",
+   "who": "both",
+   "description": "Alice holds a, Bob holds b. MtA turns the product a · b into two shares alpha + beta = a · b mod n without either side learning the other's input. Planned: we are waiting for the description from our supervisors.",
+   "formula": "",
+   "worked": "",
+   "status": "planned",
+   "inputs": {},
+   "result": {}
+  },
+  {
+   "id": "twoparty.sign",
+   "section": "twoparty",
+   "title": "Joint signature",
+   "who": "both",
+   "description": "Alice and Bob create k together and use MtA for the products of secrets, so they produce a normal (r, s) without ever putting d together. Planned: follows once MtA is in place.",
+   "formula": "",
+   "worked": "",
+   "status": "planned",
+   "inputs": {},
+   "result": {}
+  },
+  {
+   "id": "reuse.sig2",
+   "section": "reuse",
+   "title": "Sign a second message with the same k",
+   "who": "signer",
+   "description": "A buggy signer uses k again for another message. Both signatures have the same r, so anyone can see that k was reused.",
+   "formula": "s2 = k⁻¹ · (e2 + r · d) mod n",
+   "worked": "{s2} = {k}⁻¹ · ({e2} + {r} · {d}) mod {n}",
+   "status": "done",
+   "inputs": {
+    "e2": {
+     "kind": "int",
+     "value": "0x3908c567feda72bc0dbdb2dff040fe0d3470dcd51b942374378a476930dbf6b3"
+    },
+    "k": {
+     "kind": "int",
+     "value": "0x9b810e766ec9d28663ca828dd5f4b3b2e4b06ce60741c7a87ce42c8218072e8d"
+    },
+    "d": {
+     "kind": "int",
+     "value": "0x1e2feb89414c343c1027c4d1c386bbc4cd613e30d8f16adf91b7584a2265b1f6"
+    }
+   },
+   "result": {
+    "r": {
+     "kind": "int",
+     "value": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640"
+    },
+    "s2": {
+     "kind": "int",
+     "value": "0x12d1bea5fb2695aa38a6e20002814918e1cd5c1dcffd22f87e8afe77e243df15"
+    }
+   }
+  },
+  {
+   "id": "reuse.k",
+   "section": "reuse",
+   "title": "Recover the nonce",
+   "who": "attacker",
+   "description": "Subtracting the two equations for s removes d. Because of the low-s rule the attacker does not know if s or s2 was flipped, so they try s − s2 and s + s2 with both signs and keep the guess that leads to Q.",
+   "formula": "k = (e − e2) / (s − s2) mod n",
+   "worked": "{k_found} = {variant} mod {n}",
+   "status": "done",
+   "inputs": {
+    "e": {
+     "kind": "int",
+     "value": "0x2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    },
+    "e2": {
+     "kind": "int",
+     "value": "0x3908c567feda72bc0dbdb2dff040fe0d3470dcd51b942374378a476930dbf6b3"
+    },
+    "s": {
+     "kind": "int",
+     "value": "0x19d6bb2ffd32c445655a6a0b046ed28d68a64e46a74ba93e5221d6c3f0dcf144"
+    },
+    "s2": {
+     "kind": "int",
+     "value": "0x12d1bea5fb2695aa38a6e20002814918e1cd5c1dcffd22f87e8afe77e243df15"
+    }
+   },
+   "result": {
+    "k_found": {
+     "kind": "int",
+     "value": "0x647ef18991362d799c357d722a0b4c4bd5fe7000a806d89342ee320ab82f12b4"
+    },
+    "variant": {
+     "kind": "text",
+     "value": "(e - e2) / (s + s2)"
+    }
+   }
+  },
+  {
+   "id": "reuse.d",
+   "section": "reuse",
+   "title": "Recover the private key",
+   "who": "attacker",
+   "description": "With k known, the equation for s has only one unknown left: d.",
+   "formula": "d = (s · k − e) · r⁻¹ mod n",
+   "worked": "{d_found} = ({s} · {k_found} − {e}) · {r}⁻¹ mod {n}",
+   "status": "done",
+   "inputs": {
+    "s": {
+     "kind": "int",
+     "value": "0x19d6bb2ffd32c445655a6a0b046ed28d68a64e46a74ba93e5221d6c3f0dcf144"
+    },
+    "k_found": {
+     "kind": "int",
+     "value": "0x647ef18991362d799c357d722a0b4c4bd5fe7000a806d89342ee320ab82f12b4"
+    },
+    "e": {
+     "kind": "int",
+     "value": "0x2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    },
+    "r": {
+     "kind": "int",
+     "value": "0xe04eaaddfd3334fcf258e721a7d9dd8dd3c9f586af9fb85d15326d6ce9e5640"
+    }
+   },
+   "result": {
+    "d_found": {
+     "kind": "int",
+     "value": "0x1e2feb89414c343c1027c4d1c386bbc4cd613e30d8f16adf91b7584a2265b1f6"
+    }
+   }
+  },
+  {
+   "id": "reuse.check",
+   "section": "reuse",
+   "title": "Check against the public key",
+   "who": "attacker",
+   "description": "The recovered d gives the public key Q. The key is lost.",
+   "formula": "d · G = Q",
+   "worked": "{d_found} · {G} = {Q_found}",
+   "status": "done",
+   "inputs": {
+    "d_found": {
+     "kind": "int",
+     "value": "0x1e2feb89414c343c1027c4d1c386bbc4cd613e30d8f16adf91b7584a2265b1f6"
+    },
+    "G": {
+     "kind": "point",
+     "x": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+     "y": "0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+    },
+    "Q": {
+     "kind": "point",
+     "x": "0xd7da18e28d6463ea9b7e93402aec0e122b76a669e04ad12f5f4b913f772751ef",
+     "y": "0x30b2258b85b729c8df9dda0cd1a5aa20ead6e416644fc6e75fbc327be89ead17"
+    }
+   },
+   "result": {
+    "Q_found": {
+     "kind": "point",
+     "x": "0xd7da18e28d6463ea9b7e93402aec0e122b76a669e04ad12f5f4b913f772751ef",
+     "y": "0x30b2258b85b729c8df9dda0cd1a5aa20ead6e416644fc6e75fbc327be89ead17"
+    },
+    "match": {
+     "kind": "bool",
+     "value": true
+    }
+   }
+  }
+ ]
+}

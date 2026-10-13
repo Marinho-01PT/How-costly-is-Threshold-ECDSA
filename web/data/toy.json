@@ -1,0 +1,704 @@
+{
+ "schema": 1,
+ "generated_by": "python -m twoparty.trace",
+ "note": "Demo values, not secret. Educational code, not constant-time.",
+ "curve": {
+  "name": "toy",
+  "p": "0x15d",
+  "a": "0x0",
+  "b": "0x7",
+  "G": {
+   "kind": "point",
+   "x": "0x2",
+   "y": "0x6d"
+  },
+  "n": "0x139",
+  "bits": 9
+ },
+ "params": {
+  "d": {
+   "kind": "int",
+   "value": "0x2a"
+  },
+  "d1": {
+   "kind": "int",
+   "value": "0x64"
+  },
+  "k": {
+   "kind": "int",
+   "value": "0x11"
+  },
+  "message": {
+   "kind": "text",
+   "value": "hello"
+  },
+  "e2": {
+   "kind": "int",
+   "value": "0x80"
+  }
+ },
+ "sections": [
+  {
+   "id": "keygen",
+   "title": "Key generation"
+  },
+  {
+   "id": "sharing",
+   "title": "Splitting the key"
+  },
+  {
+   "id": "sign",
+   "title": "Signing on one device"
+  },
+  {
+   "id": "verify",
+   "title": "Verification"
+  },
+  {
+   "id": "mta",
+   "title": "Multiplicative to additive (MtA)"
+  },
+  {
+   "id": "twoparty",
+   "title": "Signing with two devices"
+  },
+  {
+   "id": "reuse",
+   "title": "What goes wrong if k is reused"
+  }
+ ],
+ "steps": [
+  {
+   "id": "keygen.d",
+   "section": "keygen",
+   "title": "Choose the private key",
+   "who": "signer",
+   "description": "The private key d is a random number between 1 and n - 1. Whoever knows d can sign.",
+   "formula": "d ∈ [1, n − 1]",
+   "worked": "{d}",
+   "status": "done",
+   "inputs": {},
+   "result": {
+    "d": {
+     "kind": "int",
+     "value": "0x2a"
+    }
+   }
+  },
+  {
+   "id": "keygen.Q",
+   "section": "keygen",
+   "title": "Compute the public key",
+   "who": "signer",
+   "description": "Q is d copies of the base point G added together. Going from d to Q is easy, going back from Q to d is the hard problem that keeps the key safe.",
+   "formula": "Q = d · G",
+   "worked": "{Q} = {d} · {G}",
+   "status": "done",
+   "inputs": {
+    "d": {
+     "kind": "int",
+     "value": "0x2a"
+    },
+    "G": {
+     "kind": "point",
+     "x": "0x2",
+     "y": "0x6d"
+    }
+   },
+   "result": {
+    "Q": {
+     "kind": "point",
+     "x": "0x159",
+     "y": "0xa9"
+    }
+   }
+  },
+  {
+   "id": "share.d1",
+   "section": "sharing",
+   "title": "Pick the first share",
+   "who": "dealer",
+   "description": "Instead of one device holding d, it is split into two parts. The first part d1 is a random number. It goes to Alice.",
+   "formula": "d1 ∈ [0, n − 1] at random",
+   "worked": "{d1}",
+   "status": "done",
+   "inputs": {},
+   "result": {
+    "d1": {
+     "kind": "int",
+     "value": "0x64"
+    }
+   }
+  },
+  {
+   "id": "share.d2",
+   "section": "sharing",
+   "title": "Compute the second share",
+   "who": "dealer",
+   "description": "The second part is whatever is missing to reach d. It goes to Bob. Since d1 is random, d2 on its own also looks random.",
+   "formula": "d2 = d − d1 mod n",
+   "worked": "{d2} = {d} − {d1} mod {n}",
+   "status": "done",
+   "inputs": {
+    "d": {
+     "kind": "int",
+     "value": "0x2a"
+    },
+    "d1": {
+     "kind": "int",
+     "value": "0x64"
+    }
+   },
+   "result": {
+    "d2": {
+     "kind": "int",
+     "value": "0xff"
+    }
+   }
+  },
+  {
+   "id": "share.check",
+   "section": "sharing",
+   "title": "The shares add up to d",
+   "who": "both",
+   "description": "Only both parts together give back the key. Each part alone fits every possible d.",
+   "formula": "d = d1 + d2 mod n",
+   "worked": "{d} = {d1} + {d2} mod {n}",
+   "status": "done",
+   "inputs": {
+    "d1": {
+     "kind": "int",
+     "value": "0x64"
+    },
+    "d2": {
+     "kind": "int",
+     "value": "0xff"
+    }
+   },
+   "result": {
+    "d": {
+     "kind": "int",
+     "value": "0x2a"
+    }
+   }
+  },
+  {
+   "id": "share.public",
+   "section": "sharing",
+   "title": "Public parts of the shares",
+   "who": "both",
+   "description": "Each device can publish d1 · G or d2 · G. They add up to the public key Q, without anyone learning d.",
+   "formula": "Q1 = d1 · G,  Q2 = d2 · G,  Q = Q1 + Q2",
+   "worked": "{Q1} + {Q2} = {Q}",
+   "status": "done",
+   "inputs": {
+    "d1": {
+     "kind": "int",
+     "value": "0x64"
+    },
+    "d2": {
+     "kind": "int",
+     "value": "0xff"
+    }
+   },
+   "result": {
+    "Q1": {
+     "kind": "point",
+     "x": "0x14",
+     "y": "0x70"
+    },
+    "Q2": {
+     "kind": "point",
+     "x": "0xd7",
+     "y": "0x53"
+    },
+    "Q": {
+     "kind": "point",
+     "x": "0x159",
+     "y": "0xa9"
+    }
+   }
+  },
+  {
+   "id": "sign.e",
+   "section": "sign",
+   "title": "Hash the message",
+   "who": "signer",
+   "description": "Signing works on a number, not on text. The message is hashed with SHA-256 and the result is reduced mod n.",
+   "formula": "e = SHA-256(m) mod n",
+   "worked": "{e} = SHA-256({m}) mod {n}",
+   "status": "done",
+   "inputs": {
+    "m": {
+     "kind": "text",
+     "value": "hello"
+    }
+   },
+   "result": {
+    "e": {
+     "kind": "int",
+     "value": "0x8"
+    }
+   }
+  },
+  {
+   "id": "sign.k",
+   "section": "sign",
+   "title": "Choose a nonce",
+   "who": "signer",
+   "description": "k is a fresh random number for every signature. It must stay secret and must never be used twice (see the last section).",
+   "formula": "k ∈ [1, n − 1] at random",
+   "worked": "{k}",
+   "status": "done",
+   "inputs": {},
+   "result": {
+    "k": {
+     "kind": "int",
+     "value": "0x11"
+    }
+   }
+  },
+  {
+   "id": "sign.R",
+   "section": "sign",
+   "title": "Compute the nonce point",
+   "who": "signer",
+   "description": "Same operation as for the public key, now with k.",
+   "formula": "R = k · G",
+   "worked": "{R} = {k} · {G}",
+   "status": "done",
+   "inputs": {
+    "k": {
+     "kind": "int",
+     "value": "0x11"
+    },
+    "G": {
+     "kind": "point",
+     "x": "0x2",
+     "y": "0x6d"
+    }
+   },
+   "result": {
+    "R": {
+     "kind": "point",
+     "x": "0x5c",
+     "y": "0x109"
+    }
+   }
+  },
+  {
+   "id": "sign.r",
+   "section": "sign",
+   "title": "Take its x coordinate",
+   "who": "signer",
+   "description": "The first half of the signature is the x coordinate of R, reduced mod n.",
+   "formula": "r = x(R) mod n",
+   "worked": "{r} = x({R}) mod {n}",
+   "status": "done",
+   "inputs": {
+    "R": {
+     "kind": "point",
+     "x": "0x5c",
+     "y": "0x109"
+    }
+   },
+   "result": {
+    "r": {
+     "kind": "int",
+     "value": "0x5c"
+    }
+   }
+  },
+  {
+   "id": "sign.kinv",
+   "section": "sign",
+   "title": "Invert the nonce",
+   "who": "signer",
+   "description": "k⁻¹ is the number that gives 1 when multiplied with k mod n.",
+   "formula": "k⁻¹ · k = 1 mod n",
+   "worked": "{k_inv} · {k} = 1 mod {n}",
+   "status": "done",
+   "inputs": {
+    "k": {
+     "kind": "int",
+     "value": "0x11"
+    }
+   },
+   "result": {
+    "k_inv": {
+     "kind": "int",
+     "value": "0xdd"
+    }
+   }
+  },
+  {
+   "id": "sign.s",
+   "section": "sign",
+   "title": "Compute s",
+   "who": "signer",
+   "description": "The second half of the signature mixes the hash, r and the private key.",
+   "formula": "s = k⁻¹ · (e + r · d) mod n",
+   "worked": "{s_raw} = {k_inv} · ({e} + {r} · {d}) mod {n}",
+   "status": "done",
+   "inputs": {
+    "k_inv": {
+     "kind": "int",
+     "value": "0xdd"
+    },
+    "e": {
+     "kind": "int",
+     "value": "0x8"
+    },
+    "r": {
+     "kind": "int",
+     "value": "0x5c"
+    },
+    "d": {
+     "kind": "int",
+     "value": "0x2a"
+    }
+   },
+   "result": {
+    "s_raw": {
+     "kind": "int",
+     "value": "0x11b"
+    }
+   }
+  },
+  {
+   "id": "sign.lows",
+   "section": "sign",
+   "title": "Use the low form of s",
+   "who": "signer",
+   "description": "Both s and n − s verify. Bitcoin and libsecp256k1 accept only the smaller one, so if s is above n / 2 it is replaced by n − s.",
+   "formula": "if s > n / 2:  s = n − s",
+   "worked": "{s}",
+   "status": "done",
+   "inputs": {
+    "s_raw": {
+     "kind": "int",
+     "value": "0x11b"
+    }
+   },
+   "result": {
+    "s": {
+     "kind": "int",
+     "value": "0x1e"
+    },
+    "flipped": {
+     "kind": "bool",
+     "value": true
+    }
+   }
+  },
+  {
+   "id": "verify.w",
+   "section": "verify",
+   "title": "Invert s",
+   "who": "verifier",
+   "description": "The verifier knows Q, the message and (r, s), but not d or k.",
+   "formula": "w = s⁻¹ mod n",
+   "worked": "{w} = {s}⁻¹ mod {n}",
+   "status": "done",
+   "inputs": {
+    "s": {
+     "kind": "int",
+     "value": "0x1e"
+    }
+   },
+   "result": {
+    "w": {
+     "kind": "int",
+     "value": "0xf0"
+    }
+   }
+  },
+  {
+   "id": "verify.u1",
+   "section": "verify",
+   "title": "First factor",
+   "who": "verifier",
+   "description": "",
+   "formula": "u1 = e · w mod n",
+   "worked": "{u1} = {e} · {w} mod {n}",
+   "status": "done",
+   "inputs": {
+    "e": {
+     "kind": "int",
+     "value": "0x8"
+    },
+    "w": {
+     "kind": "int",
+     "value": "0xf0"
+    }
+   },
+   "result": {
+    "u1": {
+     "kind": "int",
+     "value": "0x2a"
+    }
+   }
+  },
+  {
+   "id": "verify.u2",
+   "section": "verify",
+   "title": "Second factor",
+   "who": "verifier",
+   "description": "",
+   "formula": "u2 = r · w mod n",
+   "worked": "{u2} = {r} · {w} mod {n}",
+   "status": "done",
+   "inputs": {
+    "r": {
+     "kind": "int",
+     "value": "0x5c"
+    },
+    "w": {
+     "kind": "int",
+     "value": "0xf0"
+    }
+   },
+   "result": {
+    "u2": {
+     "kind": "int",
+     "value": "0xaa"
+    }
+   }
+  },
+  {
+   "id": "verify.P",
+   "section": "verify",
+   "title": "Rebuild the nonce point",
+   "who": "verifier",
+   "description": "If the signature is honest, u1 · G + u2 · Q is the same point R the signer used, because u1 + u2 · d = k mod n.",
+   "formula": "P = u1 · G + u2 · Q",
+   "worked": "{P} = {u1} · {G} + {u2} · {Q}",
+   "status": "done",
+   "inputs": {
+    "u1": {
+     "kind": "int",
+     "value": "0x2a"
+    },
+    "u2": {
+     "kind": "int",
+     "value": "0xaa"
+    },
+    "G": {
+     "kind": "point",
+     "x": "0x2",
+     "y": "0x6d"
+    },
+    "Q": {
+     "kind": "point",
+     "x": "0x159",
+     "y": "0xa9"
+    }
+   },
+   "result": {
+    "P": {
+     "kind": "point",
+     "x": "0x5c",
+     "y": "0x54"
+    }
+   }
+  },
+  {
+   "id": "verify.check",
+   "section": "verify",
+   "title": "Compare with r",
+   "who": "verifier",
+   "description": "The signature is valid if the x coordinate of P matches r.",
+   "formula": "x(P) mod n = r",
+   "worked": "{x_P} = {r}",
+   "status": "done",
+   "inputs": {
+    "P": {
+     "kind": "point",
+     "x": "0x5c",
+     "y": "0x54"
+    },
+    "r": {
+     "kind": "int",
+     "value": "0x5c"
+    }
+   },
+   "result": {
+    "x_P": {
+     "kind": "int",
+     "value": "0x5c"
+    },
+    "valid": {
+     "kind": "bool",
+     "value": true
+    }
+   }
+  },
+  {
+   "id": "mta",
+   "section": "mta",
+   "title": "Multiplicative to additive conversion",
+   "who": "both",
+   "description": "Alice holds a, Bob holds b. MtA turns the product a · b into two shares alpha + beta = a · b mod n without either side learning the other's input. Planned: we are waiting for the description from our supervisors.",
+   "formula": "",
+   "worked": "",
+   "status": "planned",
+   "inputs": {},
+   "result": {}
+  },
+  {
+   "id": "twoparty.sign",
+   "section": "twoparty",
+   "title": "Joint signature",
+   "who": "both",
+   "description": "Alice and Bob create k together and use MtA for the products of secrets, so they produce a normal (r, s) without ever putting d together. Planned: follows once MtA is in place.",
+   "formula": "",
+   "worked": "",
+   "status": "planned",
+   "inputs": {},
+   "result": {}
+  },
+  {
+   "id": "reuse.sig2",
+   "section": "reuse",
+   "title": "Sign a second message with the same k",
+   "who": "signer",
+   "description": "A buggy signer uses k again for another message. Both signatures have the same r, so anyone can see that k was reused.",
+   "formula": "s2 = k⁻¹ · (e2 + r · d) mod n",
+   "worked": "{s2} = {k}⁻¹ · ({e2} + {r} · {d}) mod {n}",
+   "status": "done",
+   "inputs": {
+    "e2": {
+     "kind": "int",
+     "value": "0x80"
+    },
+    "k": {
+     "kind": "int",
+     "value": "0x11"
+    },
+    "d": {
+     "kind": "int",
+     "value": "0x2a"
+    }
+   },
+   "result": {
+    "r": {
+     "kind": "int",
+     "value": "0x5c"
+    },
+    "s2": {
+     "kind": "int",
+     "value": "0x73"
+    }
+   }
+  },
+  {
+   "id": "reuse.k",
+   "section": "reuse",
+   "title": "Recover the nonce",
+   "who": "attacker",
+   "description": "Subtracting the two equations for s removes d. Because of the low-s rule the attacker does not know if s or s2 was flipped, so they try s − s2 and s + s2 with both signs and keep the guess that leads to Q.",
+   "formula": "k = (e − e2) / (s − s2) mod n",
+   "worked": "{k_found} = {variant} mod {n}",
+   "status": "done",
+   "inputs": {
+    "e": {
+     "kind": "int",
+     "value": "0x8"
+    },
+    "e2": {
+     "kind": "int",
+     "value": "0x80"
+    },
+    "s": {
+     "kind": "int",
+     "value": "0x1e"
+    },
+    "s2": {
+     "kind": "int",
+     "value": "0x73"
+    }
+   },
+   "result": {
+    "k_found": {
+     "kind": "int",
+     "value": "0x128"
+    },
+    "variant": {
+     "kind": "text",
+     "value": "(e - e2) / (s - s2)"
+    }
+   }
+  },
+  {
+   "id": "reuse.d",
+   "section": "reuse",
+   "title": "Recover the private key",
+   "who": "attacker",
+   "description": "With k known, the equation for s has only one unknown left: d.",
+   "formula": "d = (s · k − e) · r⁻¹ mod n",
+   "worked": "{d_found} = ({s} · {k_found} − {e}) · {r}⁻¹ mod {n}",
+   "status": "done",
+   "inputs": {
+    "s": {
+     "kind": "int",
+     "value": "0x1e"
+    },
+    "k_found": {
+     "kind": "int",
+     "value": "0x128"
+    },
+    "e": {
+     "kind": "int",
+     "value": "0x8"
+    },
+    "r": {
+     "kind": "int",
+     "value": "0x5c"
+    }
+   },
+   "result": {
+    "d_found": {
+     "kind": "int",
+     "value": "0x2a"
+    }
+   }
+  },
+  {
+   "id": "reuse.check",
+   "section": "reuse",
+   "title": "Check against the public key",
+   "who": "attacker",
+   "description": "The recovered d gives the public key Q. The key is lost.",
+   "formula": "d · G = Q",
+   "worked": "{d_found} · {G} = {Q_found}",
+   "status": "done",
+   "inputs": {
+    "d_found": {
+     "kind": "int",
+     "value": "0x2a"
+    },
+    "G": {
+     "kind": "point",
+     "x": "0x2",
+     "y": "0x6d"
+    },
+    "Q": {
+     "kind": "point",
+     "x": "0x159",
+     "y": "0xa9"
+    }
+   },
+   "result": {
+    "Q_found": {
+     "kind": "point",
+     "x": "0x159",
+     "y": "0xa9"
+    },
+    "match": {
+     "kind": "bool",
+     "value": true
+    }
+   }
+  }
+ ]
+}
