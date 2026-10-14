@@ -15,86 +15,58 @@
   <header class="site-header">
     <div class="wrap header-inner">
       <div>
-        <p class="eyebrow">How costly is threshold ECDSA?</p>
         <h1>ECDSA step by step</h1>
+        <p class="tagline">How a digital signature works, one small step at a time.</p>
       </div>
-      <div class="curve-switch" role="group" aria-label="Curve">
-        <button type="button" data-curve="toy" aria-pressed="true">Toy curve</button>
-        <button type="button" data-curve="secp256k1" aria-pressed="false">secp256k1</button>
+      <div class="curve-switch" role="group" aria-label="Size of the numbers">
+        <button type="button" data-curve="toy" aria-pressed="true" title="Small numbers you can check by hand">Small numbers</button>
+        <button type="button" data-curve="secp256k1" aria-pressed="false" title="The real curve secp256k1 used by Bitcoin">Real size</button>
       </div>
     </div>
   </header>
 
   <main class="wrap">
-    <section class="intro" aria-labelledby="intro-title">
-      <h2 id="intro-title" class="visually-hidden">About this page</h2>
-      <p>
-        This page follows one key through generation, splitting into two shares, signing and
-        verification. Every number was computed by our Python code (<code>src/twoparty</code>).
-        On the toy curve you can change the numbers yourself; the page then recomputes them in
-        your browser with the same steps, checked against Python test cases.
-      </p>
-      <div id="curve-info" class="curve-info"></div>
-    </section>
+    <nav id="phases" class="phases-wrap" aria-label="Phases"></nav>
 
-    <section class="big-picture" aria-labelledby="overview-title">
-      <h2 id="overview-title">The big picture</h2>
-      <p class="small">
-        ECDSA lets someone sign a message so that everyone can check it, without revealing the
-        secret used to sign. Our project adds step 2: the secret is split between two devices.
-        Select a box to jump there.
-      </p>
-      <div id="overview"></div>
-    </section>
+    <div id="step" class="step" tabindex="-1"></div>
 
-    <div class="layout">
-      <nav class="sidebar" aria-label="Steps">
-        <details class="nav-details" open>
-          <summary>All steps</summary>
-          <div id="nav"></div>
-        </details>
-      </nav>
+    <div class="stepper">
+      <button type="button" id="prev" class="btn">Back</button>
+      <p id="counter" class="counter" aria-live="polite"></p>
+      <button type="button" id="next" class="btn btn-primary">Next</button>
+    </div>
 
-      <div class="content">
-        <nav id="phases" aria-label="Phases"></nav>
-        <div class="stepper">
-          <button type="button" id="prev" class="btn">Previous</button>
-          <p id="counter" class="counter" aria-live="polite"></p>
-          <button type="button" id="next" class="btn btn-primary">Next</button>
+    <div class="extras">
+      <div id="sharing-slot"></div>
+
+      <details id="editor-box" class="fold">
+        <summary>Try your own numbers <span id="source" class="source" data-kind="browser" hidden>Your numbers</span></summary>
+        <div id="editor" class="fold-body"></div>
+      </details>
+
+      <details class="fold">
+        <summary>All steps</summary>
+        <div id="nav" class="fold-body"></div>
+      </details>
+
+      <details class="fold">
+        <summary>About this page</summary>
+        <div class="fold-body">
+          <p>
+            Every number on this page was computed by our Python code (<code>src/twoparty</code>).
+            When you change numbers yourself, the page recomputes them in your browser with the
+            same steps, which are checked against Python test cases.
+          </p>
+          <div id="curve-info"></div>
+          <p class="small">
+            HSG Bachelor project on two-party ECDSA, supervised by Prof. Katerina Mitrokotsa and Nan Cheng.
+            <a href="https://github.com/Marinho-01PT/How-costly-is-Threshold-ECDSA">Source code</a>.
+            Educational code: not constant-time and not safe against side channels. The demo keys
+            are public. Never use this code or these numbers for real funds.
+          </p>
         </div>
-        <div id="step" class="step" tabindex="-1"></div>
-        <p class="small kbd-hint">Tip: the left and right arrow keys also move between steps.</p>
-
-        <section class="panel" aria-labelledby="editor-title">
-          <div class="panel-head">
-            <h2 id="editor-title">Try your own numbers</h2>
-            <span id="source" class="source" data-kind="python">Values from Python</span>
-          </div>
-          <div id="editor"></div>
-        </section>
-
-        <section class="panel" aria-labelledby="sharing-title">
-          <div class="panel-head">
-            <h2 id="sharing-title">Splitting a key, hands on</h2>
-            <span class="source" data-kind="browser">Computed in your browser</span>
-          </div>
-          <div id="sharing"></div>
-        </section>
-      </div>
+      </details>
     </div>
   </main>
-
-  <footer class="site-footer">
-    <div class="wrap">
-      <p>
-        HSG Bachelor project on two-party ECDSA, supervised by Prof. Katerina Mitrokotsa and Nan Cheng.
-        <a href="https://github.com/Marinho-01PT/How-costly-is-Threshold-ECDSA">Source code</a>.
-      </p>
-      <p class="small">
-        Educational code: not constant-time and not safe against side channels. The demo keys
-        are public. Never use this code or these numbers for real funds.
-      </p>
-    </div>
-  </footer>
 </body>
 </html>

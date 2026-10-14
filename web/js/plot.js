@@ -51,10 +51,9 @@ export function renderPlot(curve, info, step) {
   if (!marks.length) return null;
 
   if (info.bits > 32) {
-    return el("figure", { class: "plot plot-note" },
-      el("p", {}, el("strong", {}, "Why there is no picture here. "),
-        "secp256k1 has about 1.16 · 10⁷⁷ points, more than there are atoms in the Earth, "
-        + "so they cannot be drawn. Switch to the toy curve to see what the points of this step look like."));
+    return el("p", { class: "plot-note small" },
+      "At real size there are about 10⁷⁷ points, far too many to draw. "
+      + "Switch to small numbers to see them.");
   }
 
   const p = Number(curve.p);
@@ -107,18 +106,9 @@ export function renderPlot(curve, info, step) {
     svg.append(g);
   }
 
-  const legend = el("ul", { class: "plot-legend" },
-    marks.filter((m) => !m.dup).map((m) =>
-      el("li", { class: `plot-key plot-${m.role}${owner(m.name) ? ` plot-${owner(m.name)}` : ""}` },
-        el("span", { class: "plot-swatch", "aria-hidden": "true" }),
-        `${label(m.name)} = (${m.x}, ${m.y})`,
-        m.role === "input" ? el("span", { class: "plot-role" }, " used") : el("span", { class: "plot-role" }, " new"))));
-
+  const hasInput = marks.some((m) => m.role === "input" && !m.dup);
   return el("figure", { class: "plot" }, svg,
-    el("figcaption", {},
-      legend,
-      el("p", { class: "small" },
-        `Each dot is one of the ${curve.n - 1n} points of the toy curve (plus the point at infinity, which `
-        + "has no place on the grid). Because the numbers wrap around mod p, the curve looks like "
-        + "scattered dots instead of a smooth line, but adding points still follows fixed rules.")));
+    el("figcaption", { class: "small" },
+      "Every dot is a point of the curve. ",
+      hasInput ? "Filled: new in this step. Ring: used in this step." : "Highlighted: new in this step."));
 }

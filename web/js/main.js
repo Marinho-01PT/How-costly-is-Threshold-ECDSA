@@ -29,6 +29,8 @@ const state = {
   curve: "toy",
   index: 0,
   edited: null,    // null: show Python's values; else { d, d1, k, e, e2 } as BigInt
+  details: false,  // "Show details" stays open across steps once opened
+  sharingOpen: false,
 };
 
 async function load() {
@@ -79,10 +81,8 @@ function renderAll() {
     b.setAttribute("aria-pressed", String(b.dataset.curve === state.curve)));
   renderCurveInfo();
   renderEditor();
-  renderOverview();
   renderNav();
   renderStep();
-  renderSharing($("sharing"), state.curves[state.curve], info(), state.edited ?? pythonValues());
 }
 
 function renderCurveInfo() {
@@ -104,14 +104,9 @@ function renderCurveInfo() {
 
 function renderEditor() {
   const box = $("editor");
-  if (state.curve !== "toy") {
-    box.replaceChildren(el("p", { class: "small" },
-      "On secp256k1 the numbers are fixed: they come straight from the Python trace. "
-      + "Switch to the toy curve to change them."));
-    $("source").textContent = "Values from Python";
-    $("source").dataset.kind = "python";
-    return;
-  }
+  // Only the small numbers can be changed; real-size values come from Python as they are.
+  $("editor-box").hidden = state.curve !== "toy";
+  if (state.curve !== "toy") return;
   const n = BigInt(info().n);
   const vals = state.edited ?? pythonValues();
   const hints = {
@@ -142,10 +137,9 @@ function renderEditor() {
     el("div", { class: "edit-actions" }, reset),
   );
   const source = $("source");
-  source.textContent = state.edited
-    ? "Computed in your browser, checked against Python test cases"
-    : "Values from Python";
-  source.dataset.kind = state.edited ? "browser" : "python";
+  source.textContent = "Your numbers";
+  source.dataset.kind = "browser";
+  source.hidden = !state.edited;
 }
 
 function onEdit(ev) {
@@ -159,14 +153,10 @@ function onEdit(ev) {
   }
   state.edited = values;
   const source = $("source");
-  source.textContent = "Computed in your browser, checked against Python test cases";
-  source.dataset.kind = "browser";
+  source.hidden = false;
   document.querySelector("#editor .btn").disabled = false;
   renderNav();
-  renderStep();
-  if (ev.type === "change") {
-    renderSharing($("sharing"), state.curves[state.curve], info(), values);
-  }
+  renderStep(ev.type !== "change");
 }
 
 function renderNav() {
@@ -185,29 +175,6 @@ function renderNav() {
         }, s.title, s.status !== "done" ? el("span", { class: "tag" }, statusText(s.status)) : null))))));
   }
   $("nav").replaceChildren(list);
-}
-
-// The big picture at the top: four boxes, each one jumps to its section.
-function renderOverview() {
-  const box = (section, title, body) => el("li", {},
-    el("button", { type: "button", class: "overview-card", onclick: () => goSection(section) },
-      el("span", { class: "overview-icon" }, icon(SECTION_ICONS[section])),
-      el("span", { class: "overview-title" }, title),
-      el("span", { class: "overview-body" }, body)));
-  const secret = (t) => el("span", { class: "pill pill-secret" }, icon("lock", "icon icon-sm"), t);
-  const pub = (t) => el("span", { class: "pill pill-public" }, t);
-  const who = (w, t) => el("span", { class: `pill pill-${w}` }, t);
-  const arrow = () => icon("arrow", "icon icon-sm overview-arrow");
-  $("overview").replaceChildren(el("ol", { class: "overview" },
-    box("keygen", "1. Make a key pair",
-      [secret("private key d"), arrow(), pub("public key Q")]),
-    box("sharing", "2. Split the private key",
-      [secret("d"), arrow(), who("alice", "d₁ for Alice"), who("bob", "d₂ for Bob")]),
-    box("sign", "3. Sign a message",
-      [pub("message"), " + ", secret("d"), arrow(), pub("signature (r, s)")]),
-    box("verify", "4. Check the signature",
-      [pub("message"), " + ", pub("(r, s)"), " + ", pub("Q"), arrow(), pub("valid?")]),
-  ));
 }
 
 function renderPhases(current) {
@@ -276,57 +243,73 @@ function glossary(s) {
       el("details", { class: "term" }, el("summary", {}, t), el("p", {}, g[t])))));
 }
 
-function renderStep() {
+function renderStep(keepSharing = false) {
   const all = steps();
   const s = all[state.index];
   const c = info();
-  const sec = trace().sections.find((x) => x.id === s.section);
   const lookup = (name) => s.result[name] ?? s.inputs[name]
     ?? ({ n: { kind: "int", value: c.n }, p: { kind: "int", value: c.p }, G: c.G })[name];
 
-  const body = [];
-  if (s.status === "planned") {
-    body.push(el("div", { class: "msg msg-planned" },
-      el("p", {}, el("strong", {}, "Not implemented yet. "),
-        "This step is a placeholder. It will follow the protocol description from our supervisors.")));
-  } else {
-    if (s.formula) {
-      body.push(el("div", { class: "formula-box" },
-        el("p", { class: "eyebrow" }, "The formula"),
-        el("p", { class: "formula", "aria-label": `Formula: ${s.formula}` }, s.formula)));
-    }
-    if (s.status === "done") {
-      body.push(el("div", { class: "worked-box" },
-        el("p", { class: "eyebrow" }, "With the numbers"), workedNode(s.worked, lookup, c)));
-      const plot = renderPlot(state.curves[state.curve], c, s);
-      body.push(el("div", { class: plot ? "values-with-plot" : "" },
-        el("div", {},
-          el("div", { class: "values-grid" },
-            valueTable("Goes in", s.inputs, c), valueTable("Comes out", s.result, c)),
-          legend(s)),
-        plot));
-    } else {
-      body.push(el("div", { class: `msg msg-${s.status === "error" ? "error" : "planned"}` },
-        el("p", {}, s.status === "error" ? "This step does not work with these values: " : "",
-          s.message ?? "")));
-    }
-  }
-
-  $("step").replaceChildren(el("article", { class: `step-card status-${s.status} section-${s.section}` },
-    el("p", { class: "eyebrow" }, sec?.title ?? ""),
+  // What everyone sees: title, the idea in plain words, the formula with numbers, the picture.
+  const main = [
     el("div", { class: "step-head" },
       el("h2", { id: "step-title", tabindex: "-1" }, s.title),
       el("span", { class: `who who-${s.who}` }, WHO[s.who] ?? s.who)),
-    s.plain ? el("div", { class: "plain" },
-      el("p", { class: "plain-label" }, "In plain words"), el("p", {}, s.plain)) : null,
-    s.description ? el("p", { class: "desc" }, s.description) : null,
-    body,
-    glossary(s)));
-  renderPhases(s.section);
+    s.plain ? el("p", { class: "lead" }, s.plain) : null,
+  ];
+  let plot = null;
+  if (s.status === "planned") {
+    main.push(el("p", { class: "msg msg-planned" },
+      el("strong", {}, "Coming later. "), "We are waiting for the protocol description from our supervisors."));
+  } else if (s.status !== "done") {
+    main.push(el("p", { class: "msg msg-error" },
+      s.status === "error" ? "This step does not work with these numbers: " : "", s.message ?? ""));
+  } else {
+    if (s.formula) {
+      main.push(el("div", { class: "formula-box" },
+        el("p", { class: "formula", "aria-label": `Formula: ${s.formula}` }, s.formula),
+        el("p", { class: "worked-line" }, el("span", { class: "worked-label" }, "with our numbers"),
+          workedNode(s.worked, lookup, c))));
+    }
+    plot = renderPlot(state.curves[state.curve], c, s);
+  }
 
-  $("counter").textContent = `Step ${state.index + 1} of ${all.length}`;
+  // Everything else waits behind one toggle.
+  const extra = [
+    s.description ? el("p", {}, s.description) : null,
+    s.status === "done"
+      ? el("div", { class: "values-grid" }, valueTable("Goes in", s.inputs, c), valueTable("Comes out", s.result, c))
+      : null,
+    s.status === "done" ? legend(s) : null,
+    glossary(s),
+  ].filter(Boolean);
+  const more = extra.length ? el("details", { class: "more", open: state.details }, el("summary", {}, "Show details"), extra) : null;
+  more?.addEventListener("toggle", () => (state.details = more.open));
+
+  $("step").replaceChildren(el("article", { class: `step-card status-${s.status} section-${s.section}` },
+    el("div", { class: plot ? "step-grid" : "" }, el("div", { class: "step-main" }, main), plot),
+    more));
+  renderPhases(s.section);
+  if (!keepSharing) renderSharingSlot(s.section);
+
+  $("counter").textContent = `${PHASE[s.section] ?? ""} · ${state.index + 1} of ${all.length}`;
   $("prev").disabled = state.index === 0;
   $("next").disabled = state.index === all.length - 1;
+}
+
+// The hands-on sharing panel only appears while the reader is in the sharing steps.
+function renderSharingSlot(section) {
+  const slot = $("sharing-slot");
+  if (section !== "sharing") {
+    slot.replaceChildren();
+    return;
+  }
+  const body = el("div", { class: "fold-body" });
+  const fold = el("details", { class: "fold fold-highlight", open: state.sharingOpen },
+    el("summary", {}, "Try it: split a key yourself"), body);
+  fold.addEventListener("toggle", () => (state.sharingOpen = fold.open));
+  renderSharing(body, state.curves[state.curve], info(), state.edited ?? pythonValues());
+  slot.replaceChildren(fold);
 }
 
 // ---- navigation -------------------------------------------------------------------
@@ -353,8 +336,6 @@ function readHash() {
 }
 
 function wire() {
-  // On phones the step list starts collapsed so the current step is visible first.
-  if (window.matchMedia("(max-width: 860px)").matches) document.querySelector(".nav-details").open = false;
   $("prev").addEventListener("click", () => go(state.index - 1));
   $("next").addEventListener("click", () => go(state.index + 1));
   document.querySelectorAll("[data-curve]").forEach((b) => b.addEventListener("click", () => {
