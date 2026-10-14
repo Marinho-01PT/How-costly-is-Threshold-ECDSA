@@ -3,7 +3,7 @@
     python -m twoparty.trace --curve toy|secp256k1|all --out web/data/
     python -m twoparty.trace --vectors tests/vectors.json
 
-Writes one JSON file per curve for the learning page in web/. Each step holds
+Writes one JSON file per curve for the protocol visualizer in web/. Each step holds
 {id, section, title, description, who, inputs, formula, worked, result, status}
 with the real values computed by ec.py, ecdsa_pure.py and sharing.py.
 

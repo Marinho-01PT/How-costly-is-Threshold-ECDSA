@@ -1,4 +1,4 @@
-// The learning page: loads the traces written by Python, shows one step at a
+// The protocol visualizer: loads the traces written by Python, shows one step at a
 // time, and recomputes the toy curve with steps.js when the user edits values.
 
 import { Curve } from "./ec.js";

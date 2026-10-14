@@ -9,7 +9,7 @@ The message hash is e = SHA-256(m) mod n. (FIPS 186 instead keeps the leftmost
 bits of the hash; for secp256k1 both give the same e, for the toy curve not.)
 
 sign_steps / verify_steps return all intermediate values, so the trace and
-the learning page show exactly what this code computed. Educational code,
+the protocol visualizer show exactly what this code computed. Educational code,
 not constant-time.
 """
 import random

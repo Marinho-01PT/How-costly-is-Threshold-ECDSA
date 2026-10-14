@@ -15,7 +15,7 @@ HSG Bachelor project, supervised by Prof. Katerina Mitrokotsa and Nan Cheng.
 | Channel between the parties, echo benchmark | done |
 | Docker setup with optional network delay | written, to be tried on a machine with Docker |
 | Pure-Python ECDSA, any curve (`ec.py`, `ecdsa_pure.py`) | done, checked against libsecp256k1 |
-| Trace recorder and learning page (`trace.py`, `web/`) | done (stage 1) |
+| Trace recorder and protocol visualizer (`trace.py`, `web/`) | done (stage 1) |
 | MtA (`mta.py`) | open, waiting for the supervisors' description |
 | Two-party signing (`protocol.py`) | open |
 | Demo UI for MtA and two-party signing, experiment (switch off a safety measure) | open |
@@ -70,7 +70,7 @@ Results are printed as one JSON line. With `--out benchmark/results/results.csv`
 they are also appended to a CSV file. Always set `--label` so runs can be told apart,
 and note the network used (Wi-Fi, cable, hotspot).
 
-## Learning page
+## Protocol visualizer
 
 `web/` is a static page that walks through key generation, key sharing,
 signing, verification and a nonce reuse attack, one step at a time, with the
@@ -130,7 +130,7 @@ src/twoparty/
   bench.py           timing helpers, echo and baseline benchmarks
 tests/               pytest; tests/js: JavaScript check against tests/vectors.json
 scripts/             find_toy_curve.py
-web/                 learning page (index.html, css/, js/, data/)
+web/                 protocol visualizer (index.html, css/, js/, data/)
 benchmark/results/   measurement output
 ```
 
