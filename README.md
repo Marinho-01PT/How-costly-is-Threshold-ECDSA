@@ -16,9 +16,13 @@ HSG Bachelor project, supervised by Prof. Katerina Mitrokotsa and Nan Cheng.
 | Docker setup with optional network delay | written, to be tried on a machine with Docker |
 | Pure-Python ECDSA, any curve (`ec.py`, `ecdsa_pure.py`) | done, checked against libsecp256k1 |
 | Trace recorder and protocol visualizer (`trace.py`, `web/`) | done (stage 1) |
-| MtA (`mta.py`) | open, waiting for the supervisors' description |
-| Two-party signing (`protocol.py`) | open |
-| Demo UI for MtA and two-party signing, experiment (switch off a safety measure) | open |
+| Paillier encryption (`paillier.py`) | done |
+| MtA (`mta.py`) | done, as described by the supervisors (semi-honest, no range proofs) |
+| Two-party signing (`protocol.py`) | done, Gennaro & Goldfeder 2018 simplified for two parties, checked against libsecp256k1 |
+| Experiment: Bob leaves out β' in MtA, Alice learns his key share | done in code and tests |
+| Benchmark of two-party signing | first version (`--task sign`) |
+| Terminal demo: Alice, Bob and an observer, study mode, event log (`demo.py`) | done |
+| Demo UI for MtA and two-party signing, experiment in the visualizer | open |
 
 ## Setup
 
@@ -35,10 +39,13 @@ pytest
 
 The code is the same everywhere. Only the address of the other party changes.
 
+Not port 5000 on macOS: AirPlay Receiver listens there, accepts the
+connection and never answers, so Alice just hangs. The examples use 5050.
+
 **Same machine**
 ```bash
-python -m twoparty --role bob   --listen 127.0.0.1:5000        # terminal 1
-python -m twoparty --role alice --peer   127.0.0.1:5000 --label local   # terminal 2
+python -m twoparty --role bob   --listen 127.0.0.1:5050        # terminal 1
+python -m twoparty --role alice --peer   127.0.0.1:5050 --label local   # terminal 2
 ```
 
 **Docker**
@@ -55,16 +62,39 @@ docker compose run --rm alice            # label it, e.g. add: --label docker-50
 docker compose exec bob tc qdisc del dev eth0 root
 ```
 
-**Two devices** (same network, port 5000 open)
+**Two devices** (same network, port 5050 open)
 ```bash
-python -m twoparty --role bob   --listen 0.0.0.0:5000                   # laptop B
-python -m twoparty --role alice --peer   <address of B>:5000 --label devices-wifi   # laptop A
+python -m twoparty --role bob   --listen 0.0.0.0:5050                   # laptop B
+python -m twoparty --role alice --peer   <address of B>:5050 --label devices-wifi   # laptop A
 ```
 
 **Single-device baseline** (no network)
 ```bash
 python -m twoparty --task baseline --rounds 200
 ```
+
+**Two-party signing** (Bob as above; Alice picks the curve, Bob follows)
+```bash
+python -m twoparty --role alice --peer 127.0.0.1:5050 --task sign --rounds 20 --label local
+python -m twoparty --role alice --peer 127.0.0.1:5050 --task sign --curve toy --rounds 200
+```
+`setup_ms` is the one-time setup (Paillier keygen, key shares), timed apart
+from the signatures. On secp256k1 one signature takes about 2.3 s, almost all
+of it Paillier with a 2048-bit N in pure Python.
+
+**Watch it step by step** (three terminals; the observer starts first and asks
+for mode, pace and the experiment)
+```bash
+python -m twoparty.demo observer --listen 127.0.0.1:5050                          # terminal 1
+python -m twoparty.demo bob      --hub    127.0.0.1:5050                          # terminal 2
+python -m twoparty.demo alice    --hub    127.0.0.1:5050                          # terminal 3
+```
+The observer is the network: Alice and Bob talk only through it. Alice and Bob
+print every value they compute, the observer only what goes over the wire.
+Modes: `study` (small numbers, every formula filled in, to calculate along),
+`toy` (as advised) and `secp256k1`. Pace: Enter in all terminals, Enter only in
+the observer, or run through. `--events FILE` writes all three views as JSON
+lines, the base for a UI later.
 
 Results are printed as one JSON line. With `--out benchmark/results/results.csv`
 they are also appended to a CSV file. Always set `--label` so runs can be told apart,
@@ -125,13 +155,18 @@ src/twoparty/
   trace.py           step registry and trace recorder (JSON for the web page)
   sharing.py         additive secret sharing
   net.py             message channel (JSON, length-prefixed), counts messages and bytes
-  mta.py             multiplicative-to-additive conversion (open)
-  protocol.py        two-party signing (open)
-  bench.py           timing helpers, echo and baseline benchmarks
+  paillier.py        Paillier encryption (compute on encrypted numbers)
+  mta.py             multiplicative-to-additive conversion with Paillier
+  protocol.py        two-party signing: setup, sign_alice, sign_bob
+  bench.py           timing helpers, echo, baseline and two-party signing benchmarks
+  demo.py            Alice, Bob and a network observer in separate terminals, step by step
 tests/               pytest; tests/js: JavaScript check against tests/vectors.json
-scripts/             find_toy_curve.py
+scripts/             find_toy_curve.py, uml.py
 web/                 protocol visualizer (index.html, css/, js/, data/)
 benchmark/results/   measurement output
+docs/sessions/       one log per programming session: what we did, what broke, why these tests
+docs/uml/            UML before/after each session (python scripts/uml.py --before <ref>)
+docs/img/            screenshots
 ```
 
 ## Notes
