@@ -67,8 +67,13 @@ def connect(host: str, port: int, retries: int = 50, delay: float = 0.1) -> Chan
     last = None
     for _ in range(retries):
         try:
-            return Channel(socket.create_connection((host, port), timeout=5))
+            sock = socket.create_connection((host, port), timeout=5)
         except OSError as exc:
             last = exc
             time.sleep(delay)
+            continue
+        # The timeout is only for connecting. Left on, every later recv would
+        # fail after 5 s, e.g. while the other side waits for Enter in the demo.
+        sock.settimeout(None)
+        return Channel(sock)
     raise ConnectionError(f"could not reach {host}:{port}") from last
