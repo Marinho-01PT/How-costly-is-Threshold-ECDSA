@@ -1,4 +1,5 @@
 import threading
+import time
 
 from twoparty import bench, net
 
@@ -42,5 +43,25 @@ def test_big_numbers_survive_json():
     ch = net.connect("127.0.0.1", port)
     ch.send({"x": big})
     assert ch.recv() == {"x": big}
+    ch.close()
+    srv.close()
+
+
+def test_no_timeout_after_connecting():
+    """The other side may take its time (the demo waits for Enter):
+    recv must not give up after the 5 s connect timeout."""
+    srv = net.listen("127.0.0.1", 0)
+    port = srv.getsockname()[1]
+
+    def serve():
+        ch = net.accept(srv)
+        time.sleep(6)  # longer than the connect timeout
+        ch.send({"ok": True})
+        ch.close()
+
+    threading.Thread(target=serve, daemon=True).start()
+    ch = net.connect("127.0.0.1", port)
+    assert ch.sock.gettimeout() is None
+    assert ch.recv() == {"ok": True}
     ch.close()
     srv.close()

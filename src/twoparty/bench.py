@@ -4,6 +4,7 @@ import statistics
 import time
 from pathlib import Path
 
+from . import ecdsa_pure, protocol
 from .ecdsa_baseline import keygen, sign
 
 
@@ -49,6 +50,38 @@ def echo_bob(channel) -> None:
     try:
         while True:
             channel.send(channel.recv())
+    except ConnectionError:
+        pass
+
+
+def sign_alice(channel, curve, rounds: int) -> tuple[list[float], float]:
+    """Two-party signing, one sample per signature. Returns (samples, setup_ms).
+
+    Setup (Paillier keygen, key shares) is timed apart, as advised. Every
+    signature is checked afterwards, outside the timing.
+    """
+    t0 = time.perf_counter()
+    key, d1, Q = protocol.setup_alice(channel, curve)
+    setup_ms = (time.perf_counter() - t0) * 1000
+    out = []
+    for i in range(rounds):
+        msg = f"tx-{i}".encode()
+        t0 = time.perf_counter()
+        sig = protocol.sign_alice(channel, curve, key, d1, msg)
+        out.append((time.perf_counter() - t0) * 1000)
+        if not ecdsa_pure.verify(curve, Q, msg, sig):
+            raise RuntimeError(f"two-party signature {i} does not verify")
+    return out, setup_ms
+
+
+def sign_bob(channel, curve) -> None:
+    """Sign tx-0, tx-1, ... with Alice until she disconnects."""
+    N, d2, _ = protocol.setup_bob(channel, curve)
+    i = 0
+    try:
+        while True:
+            protocol.sign_bob(channel, curve, N, d2, f"tx-{i}".encode())
+            i += 1
     except ConnectionError:
         pass
 

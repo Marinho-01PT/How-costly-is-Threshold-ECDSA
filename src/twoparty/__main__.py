@@ -1,8 +1,9 @@
 """Command line entry point.
 
 Examples (same code in every variant, only the address changes):
-  python -m twoparty --role bob   --listen 127.0.0.1:5000
-  python -m twoparty --role alice --peer   127.0.0.1:5000 --task echo --rounds 200
+  python -m twoparty --role bob   --listen 127.0.0.1:5050
+  python -m twoparty --role alice --peer   127.0.0.1:5050 --task echo --rounds 200
+  python -m twoparty --role alice --peer   127.0.0.1:5050 --task sign --curve toy --rounds 50
   python -m twoparty --task baseline --rounds 200
 """
 import argparse
@@ -11,7 +12,8 @@ import json
 import platform
 import sys
 
-from . import bench, net, protocol
+from . import bench, net
+from .ec import CURVES
 
 
 def addr(text: str) -> tuple[str, int]:
@@ -27,6 +29,8 @@ def main(argv=None) -> int:
     p.add_argument("--task", choices=["echo", "baseline", "sign"], default="echo")
     p.add_argument("--rounds", type=int, default=100)
     p.add_argument("--payload", type=int, default=64, help="echo payload in bytes")
+    p.add_argument("--curve", choices=sorted(CURVES), default="secp256k1",
+                   help="curve for --task sign (Alice decides, Bob follows)")
     p.add_argument("--label", default="unlabelled", help="name of the variant, e.g. docker-50ms")
     p.add_argument("--out", help="append the result to this CSV file")
     p.add_argument("--once", action="store_true", help="Bob: serve one connection, then exit")
@@ -53,7 +57,7 @@ def run_bob(a) -> int:
         if hello["task"] == "echo":
             bench.echo_bob(ch)
         elif hello["task"] == "sign":
-            protocol.sign_bob(ch, 0, b"")
+            bench.sign_bob(ch, CURVES[hello["curve"]])
         ch.close()
         if a.once:
             return 0
@@ -63,20 +67,22 @@ def run_alice(a) -> int:
     if not a.peer:
         sys.exit("Alice needs --peer host:port")
     ch = net.connect(*addr(a.peer))
-    ch.send({"task": a.task})
+    ch.send({"task": a.task, "curve": a.curve})
     if a.task == "echo":
         samples = bench.echo_alice(ch, a.rounds, a.payload)
         report(a, samples, ch.stats())
     else:
-        protocol.sign_alice(ch, 0, b"")
+        samples, setup_ms = bench.sign_alice(ch, CURVES[a.curve], a.rounds)
+        report(a, samples, ch.stats(), {"curve": a.curve, "setup_ms": round(setup_ms, 4)})
     ch.close()
     return 0
 
 
-def report(a, samples, stats) -> None:
+def report(a, samples, stats, extra=None) -> None:
     row = {
         "time": datetime.datetime.now().isoformat(timespec="seconds"),
         "label": a.label, "task": a.task, "host": platform.node(),
+        **(extra or {}),
         **{k: round(v, 4) if isinstance(v, float) else v for k, v in bench.summarize(samples).items()},
         **(stats or {}),
     }
