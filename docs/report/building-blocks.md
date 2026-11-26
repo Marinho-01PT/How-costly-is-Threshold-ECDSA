@@ -44,8 +44,8 @@
 | Paillier key size (`paillier_bits`) | 2048, 3072 |
 | Message format (`wire`) | `json`: numbers as decimal text. `binary`: numbers as raw bytes, with a small tag-length-value encoding |
 | Safety experiment (`mask`) | with $\beta'$, without $\beta'$ (see `threat-model.md`) |
-| Use of MtA | 4 separate MtAs. **Planned:** $\mathrm{Enc}(d_1)$ once at setup, $\mathrm{Enc}(k_1)$ reused. **[PLACEHOLDER: added by the MtA-reuse work]** |
-| Message flow | 14 messages. **Planned:** batched into 4. **[PLACEHOLDER: added by the batching work]** |
+| Use of MtA | `separate`: 4 separate MtAs. `reuse`: $\mathrm{Enc}(d_1)$ once at setup, $\mathrm{Enc}(k_1)$ sent once and used for both MtAs with $k_1$ |
+| Message flow | `sequential`: 14 messages. `batched`: 4 messages per signature |
 | Network | localhost, Docker with added delay, two devices over Wi-Fi. **[PLACEHOLDER: Wi-Fi numbers]** |
 
 ### Paillier, naive
@@ -144,8 +144,9 @@ has only 256 bits instead of 2048.
 | 3072-bit Paillier key | 6862 ms | 0.33× | 0.15 | 16.5 ms | 15'588 | – |
 | binary messages | 2245 ms | 1.01× | 0.45 | 16.6 ms | 4'540 | – |
 | all speed-ups together | 16.1 ms | 140× | 62.1 | 0.05 ms | 4'540 | 0.67 s |
-| MtA reuse | **[PLACEHOLDER]** | | | | | |
-| batched messages (4) | **[PLACEHOLDER]** | | | | | |
+| MtA reuse | 1557 ms | 1.45× | 0.64 | 16.4 ms | 8'167 | – |
+| batched messages (4) | 2276 ms | 0.99× | 0.44 | 17.6 ms | 10'574 | – |
+| all speed-ups incl. reuse and batched | 15.9 ms | 143× | 63.0 | 0.06 ms | 3'430 | 0.67 s |
 | two devices over Wi-Fi | **[PLACEHOLDER]** | | | | | |
 
 **The operation counts explain the matrix.** One signature has 4 MtAs. Alice
@@ -181,9 +182,17 @@ What this means:
 ## 5. Open rows
 
 - **MtA reuse** ($\mathrm{Enc}(d_1)$ once at setup, $\mathrm{Enc}(k_1)$ for two
-  MtAs): **[PLACEHOLDER: description, effect on encryptions per signature,
-  measured numbers]**
-- **Batched messages (14 → 4):** **[PLACEHOLDER]**
+  MtAs): Alice sends 2 ciphertexts per signature instead of 4 (Enc($k_1$) and
+  Enc($\gamma_1$)); Enc($d_1$) travels once with the setup message and Bob keeps
+  it. That removes 2 of Alice's 4 encryptions (≈ 2 × 187 ms with Python `int`)
+  and 2 messages. Measured: 1557 ms instead of 2262 ms (−31 %), 12 messages,
+  8'167 bytes. Bob still does 4 exponentiations $c_A^{\,b}$ and 4 encryptions of $\beta'$.
+- **Batched messages (14 → 4):** A→B: $\Gamma_1$ and all of Alice's ciphertexts;
+  B→A: $\Gamma_2$, all four $c_B$ and $\delta_2$; A→B: $\delta_1$ and $s_1$;
+  B→A: $s_2$. Same computation, same signature. On localhost it saves no time
+  (2276 ms), because a message costs well under a millisecond there. It is
+  expected to matter over a real network, where every message waits one
+  network delay: 10 fewer messages save about 5 round trips per signature.
 - **Two devices over Wi-Fi:** **[PLACEHOLDER: setup, round-trip time, signing
   time with JSON and binary]**
 
