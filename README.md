@@ -23,7 +23,7 @@ HSG Bachelor project, supervised by Prof. Katerina Mitrokotsa and Nan Cheng.
 | Benchmark of two-party signing | `--task sign` with any combination of building blocks, `--task matrix` for all of them |
 | Building blocks: libsecp256k1 in the protocol, gmpy2, Paillier CRT decryption and encryption, precomputed r^N, 3072-bit key, binary messages (`config.py`) | done, every variant tested to give a valid signature |
 | Building blocks: MtA reuse, batched messages, two devices over Wi-Fi | open |
-| Interface with one row per building block (study and benchmark mode) | open |
+| Interface with one row per building block, study and benchmark mode (`python -m twoparty ui`) | done |
 | Terminal demo: Alice, Bob and an observer, study mode, event log (`demo.py`) | done |
 | Demo UI for MtA and two-party signing, experiment in the visualizer | open |
 
@@ -63,6 +63,31 @@ The matrix runs the original, every variant on its own, and all speed-ups
 together, and writes one CSV row each to `benchmark/results/`: signing time
 (mean, median, p95), signatures per second, verification time, messages and
 bytes per signature, and setup and offline time apart.
+
+## Building-block lab (web interface)
+
+```bash
+python -m twoparty ui            # opens http://127.0.0.1:8765
+python -m twoparty ui --port 9000 --no-browser
+```
+
+One table row per building block (taken from `config.ROWS`, so new rows show
+up by themselves; planned variants are listed but cannot be chosen).
+
+- **Study mode** runs one real signature (Alice and Bob over a local socket)
+  and lists every step and every message: who computes, which building blocks
+  are at work (their rows are highlighted), the time spent and all values.
+  Back/Next or the arrow keys. The toy curve keeps the numbers small; the
+  experiment without β′ shows Alice recovering Bob's key share.
+- **Benchmark mode** runs N signatures per configuration: the one chosen,
+  every variant alone, or original against all speed-ups. Results arrive row
+  by row (signatures per second, signing mean/median/p95, verification,
+  messages and bytes per signature, offline time) with a bar chart, and are
+  saved as `benchmark/results/lab-<time>.csv`. "Bob at host:port" points the
+  benchmark at a Bob elsewhere, e.g. on a second laptop
+  (`python -m twoparty --role bob --listen 0.0.0.0:5050`).
+
+Standard library only (`ui_server.py`, `lab.py`, `web/lab/`), no build step.
 
 ## Run it
 

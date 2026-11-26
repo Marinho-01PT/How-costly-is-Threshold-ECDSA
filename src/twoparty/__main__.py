@@ -34,6 +34,11 @@ def addr(text: str) -> tuple[str, int]:
 
 
 def main(argv=None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["ui"]:  # python -m twoparty ui [--port 8765] [--no-browser]: the web lab
+        from .ui_server import serve
+        port = int(argv[argv.index("--port") + 1]) if "--port" in argv else 8765
+        return serve(port=port, open_browser="--no-browser" not in argv)
     p = argparse.ArgumentParser(prog="twoparty")
     p.add_argument("--role", choices=["alice", "bob"])
     p.add_argument("--listen", help="host:port to wait on (Bob)")

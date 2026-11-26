@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Building-block lab</title>
+  <meta name="description" content="Two-party ECDSA: one variant per building block, one signature step by step, or a benchmark.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="lab.css">
+  <script type="module" src="lab.js"></script>
+</head>
+<body>
+<h1>Two-party ECDSA: building-block lab</h1>
+<p>Choose one variant per building block. Study mode runs one signature and lists every step;
+benchmark mode runs many signatures and measures them. Alice and Bob are real processes talking over a socket.</p>
+
+<form id="top" class="line">
+  <label>Curve <select id="curve"></select></label>
+  <label>Mode
+    <label class="inline"><input type="radio" name="mode" value="study" checked> study</label>
+    <label class="inline"><input type="radio" name="mode" value="auto"> benchmark</label>
+  </label>
+  <label>Theme <select id="theme">
+    <option value="auto">auto</option><option value="light">light</option><option value="dark">dark</option>
+  </select></label>
+</form>
+
+<div class="cols">
+<div class="col-left">
+  <h2>Building blocks</h2>
+  <p class="line">
+    <button type="button" id="preset-original">Original protocol</button>
+    <button type="button" id="preset-fast">All speed-ups</button>
+  </p>
+  <table id="rows" class="grid">
+    <thead><tr><th>Building block</th><th>Variant</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="note">Configuration: <code id="config-label">original</code></p>
+</div>
+
+<div class="col-right">
+  <section id="study">
+    <h2>Study mode</h2>
+    <form id="study-form" class="line">
+      <label class="grow">Message <input id="message" type="text" value="Alice and Bob send 1 coin to Carol" autocomplete="off"></label>
+      <button type="submit" id="study-run">Run one signature</button>
+    </form>
+    <p id="study-status" class="status" role="status"></p>
+    <div id="study-out" hidden>
+      <p id="summary"></p>
+      <p class="line">
+        <button type="button" id="prev">&larr; Back</button>
+        <button type="button" id="next">Next &rarr;</button>
+        <span id="counter"></span>
+        <span class="note">(arrow keys work too)</span>
+      </p>
+      <table id="step" class="grid step" aria-live="polite"><tbody></tbody></table>
+      <h3>Values in this step</h3>
+      <table id="values" class="grid values"><tbody></tbody></table>
+      <p id="leak" class="leak" hidden></p>
+      <h3>All steps</h3>
+      <div class="scroll">
+        <table id="timeline" class="grid timeline">
+          <thead><tr><th>#</th><th>Party</th><th>Step</th><th>Time</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="auto" hidden>
+    <h2>Benchmark mode</h2>
+    <form id="auto-form">
+      <table class="grid form">
+        <tbody>
+          <tr><th>Configurations</th><td>
+            <label class="inline"><input type="radio" name="kind" value="current" checked> the one on the left</label><br>
+            <label class="inline"><input type="radio" name="kind" value="matrix"> original, then each variant alone, then all speed-ups</label><br>
+            <label class="inline"><input type="radio" name="kind" value="together"> original and all speed-ups</label>
+          </td></tr>
+          <tr><th><label for="rounds">Signatures per configuration</label></th>
+            <td><input id="rounds" type="number" min="1" max="1000" value="10"></td></tr>
+          <tr><th><label for="peer">Bob at host:port</label></th>
+            <td><input id="peer" type="text" placeholder="empty = local Bob" autocomplete="off" spellcheck="false"></td></tr>
+        </tbody>
+      </table>
+      <p><button type="submit" id="auto-run">Start benchmark</button></p>
+    </form>
+    <p id="auto-status" class="status" role="status"></p>
+    <div id="auto-out" hidden>
+      <h3>Signatures per second</h3>
+      <div id="chart"></div>
+      <h3>Results</h3>
+      <div class="scroll">
+        <table id="results" class="grid num-table">
+          <thead>
+            <tr>
+              <th>Configuration</th><th>sig/s</th><th>sign mean ms</th><th>median ms</th><th>p95 ms</th>
+              <th>verify ms</th><th>msgs/sig</th><th>bytes/sig</th><th>offline ms</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p id="csv-note" class="note"></p>
+    </div>
+  </section>
+</div>
+</div>
+</body>
+</html>
