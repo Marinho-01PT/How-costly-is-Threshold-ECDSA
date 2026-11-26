@@ -46,6 +46,10 @@ def main(argv=None) -> int:
         from . import demo
         rest = argv[1:]
         return demo.main(rest if argv[0] == "demo" else ["lan", *rest])
+    if argv[:1] == ["ui"]:  # python -m twoparty ui [--port 8765] [--no-browser]: the web lab
+        from .ui_server import serve
+        port = int(argv[argv.index("--port") + 1]) if "--port" in argv else 8765
+        return serve(port=port, open_browser="--no-browser" not in argv)
     p = argparse.ArgumentParser(prog="twoparty")
     p.add_argument("--role", choices=["alice", "bob"])
     p.add_argument("--listen", help="host:port to wait on (Bob)")

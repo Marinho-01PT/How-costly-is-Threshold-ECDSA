@@ -1,0 +1,86 @@
+/* Plain lab-tool page. One accent colour: the highlight of the active row. */
+
+:root {
+  --bg: #ffffff; --text: #111111; --muted: #555555; --line: #bbbbbb; --head: #eeeeee;
+  --hl: #fff3a8; --hl-line: #b39200; --bar: #555555; --bar-slow: #999999; --bad: #a40000;
+  --mono: ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161616; --text: #e4e4e4; --muted: #a0a0a0; --line: #4a4a4a; --head: #262626;
+    --hl: #4a3f00; --hl-line: #c9a800; --bar: #b0b0b0; --bar-slow: #6a6a6a; --bad: #ff8080;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161616; --text: #e4e4e4; --muted: #a0a0a0; --line: #4a4a4a; --head: #262626;
+  --hl: #4a3f00; --hl-line: #c9a800; --bar: #b0b0b0; --bar-slow: #6a6a6a; --bad: #ff8080;
+  color-scheme: dark;
+}
+
+body { margin: 0 auto; max-width: 1280px; padding: 12px 16px 40px; background: var(--bg); color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+h1 { font-size: 20px; margin: 4px 0 6px; }
+h2 { font-size: 16px; margin: 14px 0 6px; }
+h3 { font-size: 14px; margin: 14px 0 4px; }
+p { margin: 6px 0; }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+a { color: inherit; }
+.note { color: var(--muted); }
+.status { color: var(--muted); min-height: 1.4em; }
+.status.error { color: var(--bad); }
+
+.line { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.line label { display: inline-flex; gap: 6px; align-items: center; }
+label.inline { display: inline-flex; gap: 4px; align-items: center; margin-right: 10px; }
+.grow { flex: 1 1 260px; }
+.grow input { flex: 1; }
+input[type="text"] { min-width: 0; width: 100%; }
+#peer { width: 220px; max-width: 100%; }
+#rounds { width: 80px; }
+input, select, button { font: inherit; }
+
+.cols { display: grid; grid-template-columns: minmax(320px, 430px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.col-left, .col-right { min-width: 0; }
+
+table.grid { border-collapse: collapse; width: 100%; }
+.grid th, .grid td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; vertical-align: top; }
+.grid thead th { background: var(--head); font-weight: 600; }
+.grid tbody th { font-weight: 600; width: 1%; white-space: nowrap; }
+
+#rows td label { display: block; }
+#rows .field { color: var(--muted); font-family: var(--mono); font-size: 11.5px; font-weight: normal; display: block; }
+#rows .planned { color: var(--muted); }
+#rows tr.active > th, #rows tr.active > td { background: var(--hl); }
+#rows tr.active > th { box-shadow: inset 3px 0 0 var(--hl-line); }
+
+.step th { width: 9em; }
+.values th { font-family: var(--mono); font-size: 12px; font-weight: normal; }
+.values td { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+.num-short { cursor: pointer; text-decoration: underline dotted; }
+.leak { border: 1px solid var(--bad); color: var(--bad); padding: 4px 8px; }
+
+.scroll { overflow: auto; max-height: 420px; border: 1px solid var(--line); }
+.scroll table.grid { border-style: hidden; }
+.timeline td:first-child, .timeline td:last-child { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.timeline tr { cursor: pointer; }
+.timeline tr.current td { background: var(--hl); }
+
+.form th { width: 14em; }
+.num-table thead th { white-space: nowrap; }
+.num-table td { font-family: var(--mono); font-size: 12px; text-align: right; white-space: nowrap; }
+.num-table td:first-child { text-align: left; white-space: normal; word-break: break-word; }
+.num-table tr.pending td { color: var(--muted); }
+
+/* bar chart: plain rectangles on an axis */
+.chart { display: grid; grid-template-columns: minmax(120px, 34%) minmax(0, 1fr); gap: 2px 8px; font-size: 12px; }
+.chart .name { font-family: var(--mono); font-size: 11.5px; word-break: break-word; padding: 2px 0; }
+.chart .track { display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--text); padding: 2px 0; min-width: 0; }
+.chart .bar { height: 14px; background: var(--bar); flex: none; }
+.chart .bar.slower { background: var(--bar-slow); }
+.chart .val { font-family: var(--mono); font-size: 11.5px; white-space: nowrap; }
+.chart .axis { border-top: 1px solid var(--text); display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.chart .axis { width: calc(100% - 15em); }
