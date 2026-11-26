@@ -65,12 +65,15 @@ def alice_encrypt(N: int, a: int, n: int) -> int:
 
 
 def bob_respond(N: int, c_A: int, b: int, n: int, mask: bool = True,
-                mask_bits: int = MASK_BITS) -> tuple[int, int, int]:
-    """Step 2 (Bob): returns (c_B, beta, beta_prime)."""
+                mask_bits: int = MASK_BITS, ops=None) -> tuple[int, int, int]:
+    """Step 2 (Bob): returns (c_B, beta, beta_prime). ops: Bob's paillier.Ops."""
     check_key(N, n, mask_bits)
     _check_input(b, n)
     beta_prime = secrets.randbelow(mask_bound(n, mask_bits)) if mask else 0
-    c_B = paillier.add(N, paillier.mul_const(N, c_A, b), paillier.encrypt(N, beta_prime))
+    if ops is None:
+        c_B = paillier.add(N, paillier.mul_const(N, c_A, b), paillier.encrypt(N, beta_prime))
+    else:
+        c_B = ops.add(ops.mul_const(c_A, b), ops.encrypt(beta_prime))
     return c_B, -beta_prime % n, beta_prime
 
 
@@ -85,23 +88,38 @@ def _show(show, step: str, **values) -> None:
         show(step, values)
 
 
-def mta_alice(channel, key: Key, a: int, n: int, show=None) -> int:
-    """Alice's side. Returns alpha. Sends one message, receives one."""
-    c_A = alice_encrypt(key.N, a, n)
-    _show(show, "send c_A = Enc(a)", a=a, c_A=c_A)
-    channel.send({"c_A": c_A})
+def mta_alice(channel, key: Key, a: int, n: int, show=None, ops=None,
+              send: bool = True) -> int:
+    """Alice's side. Returns alpha. Sends one message, receives one.
+
+    ops: Alice's paillier.Ops (the chosen variants). None: the naive functions.
+    send=False: Bob already has Enc(a) from an earlier message (MtA reuse),
+    so Alice only receives c_B and decrypts.
+    """
+    if send:
+        if ops is None:
+            c_A = alice_encrypt(key.N, a, n)
+        else:
+            _check_input(a, n)
+            c_A = ops.encrypt(a)
+        _show(show, "send c_A = Enc(a)", a=a, c_A=c_A)
+        channel.send({"c_A": c_A})
     c_B = channel.recv()["c_B"]
-    plain = paillier.decrypt(key, c_B)  # a*b + beta' as a whole number
+    plain = paillier.decrypt(key, c_B) if ops is None else ops.decrypt(c_B)  # a*b + beta' as a whole number
     alpha = plain % n
     _show(show, "alpha = Dec(c_B) mod n", c_B=c_B, plain=plain, alpha=alpha)
     return alpha
 
 
 def mta_bob(channel, N: int, b: int, n: int, mask: bool = True, show=None,
-            mask_bits: int = MASK_BITS) -> int:
-    """Bob's side. Returns beta. mask=False only for the experiment."""
-    c_A = channel.recv()["c_A"]
-    c_B, beta, beta_prime = bob_respond(N, c_A, b, n, mask, mask_bits)
+            mask_bits: int = MASK_BITS, ops=None, c_A: int | None = None) -> int:
+    """Bob's side. Returns beta. mask=False only for the experiment.
+
+    c_A given: Bob already holds Enc(a) (MtA reuse) and receives nothing.
+    """
+    if c_A is None:
+        c_A = channel.recv()["c_A"]
+    c_B, beta, beta_prime = bob_respond(N, c_A, b, n, mask, mask_bits, ops)
     _show(show, "send c_B = c_A^b * Enc(beta'), keep beta = -beta' mod n",
           c_A=c_A, b=b, beta_prime=beta_prime, c_B=c_B, beta=beta)
     channel.send({"c_B": c_B})

@@ -20,7 +20,12 @@ HSG Bachelor project, supervised by Prof. Katerina Mitrokotsa and Nan Cheng.
 | MtA (`mta.py`) | done, as described by the supervisors (semi-honest, no range proofs) |
 | Two-party signing (`protocol.py`) | done, Gennaro & Goldfeder 2018 simplified for two parties, checked against libsecp256k1 |
 | Experiment: Bob leaves out β' in MtA, Alice learns his key share | done in code and tests |
-| Benchmark of two-party signing | first version (`--task sign`) |
+| Benchmark of two-party signing | `--task sign` with any combination of building blocks, `--task matrix` for all of them |
+| Building blocks: libsecp256k1 in the protocol, gmpy2, Paillier CRT decryption and encryption, precomputed r^N, 3072-bit key, binary messages (`config.py`) | done, every variant tested to give a valid signature |
+| Building blocks: MtA reuse, batched messages | done |
+| Two laptops on the same Wi-Fi: pairing code, in the terminal demo and in the web lab | done, tested on one machine so far |
+| Interface with one row per building block, study and benchmark mode (`python -m twoparty ui`) | done |
+| Pairing in the web lab: one laptop is Bob, the other joins with the 4-digit code | done |
 | Terminal demo: Alice, Bob and an observer, study mode, event log (`demo.py`) | done |
 | Demo UI for MtA and two-party signing, experiment in the visualizer | open |
 
@@ -34,6 +39,95 @@ pytest
 
 `pytest` also runs the JavaScript check in `tests/js/` if Node.js is installed
 (`brew install node`); without Node that one test is skipped.
+
+## Building blocks
+
+Every row of the table "Building blocks and their implementations" on our
+protocol sheet is one field of `Config` in `src/twoparty/config.py`. `Config()`
+is the protocol as we first built it; `--set row=variant` swaps one block.
+
+| Row (`--set`) | Variants (first = original) |
+|---|---|
+| `curve` | `pure`, `libsecp256k1` |
+| `bignum` | `int`, `gmpy2` (`pip install -e ".[fast]"`) |
+| `paillier_dec` | `naive`, `crt` |
+| `paillier_enc` | `naive`, `crt` (Alice only, Bob has no p and q), `precomputed` (r^N offline) |
+| `paillier_bits` | `2048`, `3072` |
+| `wire` | `json`, `binary` |
+| `mask` | `true`, `false` (the experiment without β′) |
+
+```bash
+python -m twoparty --task matrix --rounds 20          # starts its own Bob on localhost
+python -m twoparty --task matrix --peer HOST:5050     # against a Bob elsewhere (Docker, second device)
+```
+
+The matrix runs the original, every variant on its own, and all speed-ups
+together, and writes one CSV row each to `benchmark/results/`: signing time
+(mean, median, p95), signatures per second, verification time, messages and
+bytes per signature, and setup and offline time apart.
+
+## Two laptops on the same Wi-Fi
+
+No IP addresses to type: one laptop hosts and prints a 4-digit pairing code,
+the other joins with it (`src/twoparty/lan.py`, UDP broadcast on port 5051).
+
+**Demo** (each person sees their own side, step by step):
+```bash
+python -m twoparty lan --name Bruno          # laptop 1: asks mode/pace/experiment, prints e.g. "Pairing code: 4821"
+python -m twoparty lan --code 4821           # laptop 2: finds laptop 1, plays Alice
+```
+Laptop 1 runs the observer as a quiet relay plus Bob; `--as alice` swaps the
+roles, `--show-network` also prints the network view there. Pace `all` means
+Enter on both laptops. The three-terminal setup with `--hub` still works.
+
+**Benchmark** between two laptops:
+```bash
+python -m twoparty --role bob --lan                          # laptop 1, prints a code
+python -m twoparty --task matrix --lan --code 4821 --label wifi   # laptop 2
+```
+
+If nothing is found, the program says what to check:
+- Both laptops must be on the same network, without VPN.
+- macOS asks once whether Python may accept incoming connections: click Allow.
+- University and guest networks (eduroam) often block traffic between devices. Use a phone hotspot instead.
+- As a fallback, type the address the host printed (`--hub IP:5050` or `--peer IP:5050`).
+
+The code only prevents connecting to the wrong laptop. It is not a password: anyone on the network can read the beacons.
+
+### In the web lab
+
+Both run `python -m twoparty ui`. Under "Partner on the same Wi-Fi", one
+picks **be Bob for a partner** and reads out the 4-digit code; the other picks
+**join a partner as Alice** and types it. From then on study mode and benchmark
+mode on Alice's laptop use the partner as Bob. Bob's page lists every session
+and the steps Bob computed in the last signature, so both screens show their
+own half. In study mode Alice's page shows both halves, put in the order the
+messages force (the two clocks are not compared).
+
+## Building-block lab (web interface)
+
+```bash
+python -m twoparty ui            # opens http://127.0.0.1:8765
+python -m twoparty ui --port 9000 --no-browser
+```
+
+One table row per building block (taken from `config.ROWS`, so new rows show
+up by themselves; planned variants are listed but cannot be chosen).
+
+- **Study mode** runs one real signature (Alice and Bob over a local socket)
+  and lists every step and every message: who computes, which building blocks
+  are at work (their rows are highlighted), the time spent and all values.
+  Back/Next or the arrow keys. The toy curve keeps the numbers small; the
+  experiment without β′ shows Alice recovering Bob's key share.
+- **Benchmark mode** runs N signatures per configuration: the one chosen,
+  every variant alone, or original against all speed-ups. Results arrive row
+  by row (signatures per second, signing mean/median/p95, verification,
+  messages and bytes per signature, offline time) with a bar chart, and are
+  saved as `benchmark/results/lab-<time>.csv`. "Bob at host:port" points the
+  benchmark at a Bob elsewhere, e.g. on a second laptop
+  (`python -m twoparty --role bob --listen 0.0.0.0:5050`).
+
+Standard library only (`ui_server.py`, `lab.py`, `web/lab/`), no build step.
 
 ## Run it
 
