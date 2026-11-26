@@ -103,3 +103,11 @@ def test_parse_peer():
     assert lab.parse_peer("") is None
     with pytest.raises(ValueError):
         lab.parse_peer("nonsense")
+
+
+def test_study_protocol_variants(server):
+    """mta=reuse and flow=batched reach the protocol in study mode too."""
+    status, t = post(server + "/api/study", {"config": {"mta": "reuse", "flow": "batched"},
+                                             "curve": "toy", "message": "1 coin to Carol"})
+    assert status == 200 and t["valid"] is True
+    assert t["signing_messages"] % 4 == 0 and t["signing_messages"] < 14

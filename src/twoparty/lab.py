@@ -180,17 +180,24 @@ def study(cfg: Config, curve_name: str = "toy", message: str = "Alice and Bob se
     port = srv.getsockname()[1]
     out: dict = {}
 
+    reuse, batched = cfg.mta == "reuse", cfg.flow == "batched"
+
     def bob_side():
         raw = net.accept(srv)
         raw.set_format(cfg.wire)
         ch = _RecChannel(raw, "bob", rec, wire_rows)
         try:
-            N, d2, Q = protocol.setup_bob(ch, pcurve, show=rec.hook("bob"))
+            c_d1 = None
+            if reuse:
+                N, d2, Q, c_d1 = protocol.setup_bob(ch, pcurve, show=rec.hook("bob"), reuse=True)
+            else:
+                N, d2, Q = protocol.setup_bob(ch, pcurve, show=rec.hook("bob"))
             ops = paillier.ops_for(cfg, N)
             if cfg.paillier_enc == "precomputed":
                 ops.precompute(4)
             out["bob"] = protocol.sign_bob(ch, pcurve, N, d2, msg, show=rec.hook("bob"),
-                                           mask=cfg.mask, ops=ops)
+                                           mask=cfg.mask, ops=ops, reuse=reuse,
+                                           batched=batched, c_d1=c_d1)
             out["d2"] = d2
         except BaseException as exc:  # reported on Alice's side
             out["error"] = exc
@@ -204,11 +211,13 @@ def study(cfg: Config, curve_name: str = "toy", message: str = "Alice and Bob se
     ch = _RecChannel(raw, "alice", rec, wire_rows)
     try:
         t_start = time.perf_counter()
-        key, d1, Q = protocol.setup_alice(ch, pcurve, key=key, show=rec.hook("alice"))
+        key, d1, Q = protocol.setup_alice(ch, pcurve, key=key, show=rec.hook("alice"),
+                                          reuse=reuse)
         ops = paillier.ops_for(cfg, key.N, key)
         if cfg.paillier_enc == "precomputed":
             ops.precompute(4)
-        sig = protocol.sign_alice(ch, pcurve, key, d1, msg, show=rec.hook("alice"), ops=ops)
+        sig = protocol.sign_alice(ch, pcurve, key, d1, msg, show=rec.hook("alice"), ops=ops,
+                                  reuse=reuse, batched=batched)
         total_ms = (time.perf_counter() - t_start) * 1000
     finally:
         raw.close()

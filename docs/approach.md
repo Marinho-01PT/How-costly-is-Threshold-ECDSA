@@ -84,11 +84,13 @@ leave out a safety step?
 | Smarter decryption (Chinese remainder theorem) | 1.7 s | 1.3× faster |
 | Bitcoin's own curve library | 2.2 s | almost no change |
 | Compact binary messages instead of text | 2.2 s | same time, 57 % fewer bytes |
+| Sending Alice's encrypted key half only once (MtA reuse) | 1.6 s | 1.45× faster, 12 instead of 14 messages |
+| Bundling messages (4 instead of 14) | 2.3 s | same time on one laptop, matters over Wi-Fi |
 | Bigger, safer Paillier key (3072 instead of 2048 bit) | 6.9 s | 3× slower |
-| **Everything together** | **0.016 s** | **140× faster** |
+| **Everything together** | **0.016 s** | **143× faster, 4 messages, 3.4 kB** |
 
-*Measured 26 Nov 2026 on one MacBook, 20 signatures each. MtA reuse,
-batched messages and Wi-Fi numbers are added once measured.*
+*Measured 26 Nov 2026 on one MacBook, 20 signatures each. Wi-Fi numbers
+between two laptops are added once measured.*
 
 **The three most important lessons:**
 
@@ -98,7 +100,7 @@ batched messages and Wi-Fi numbers are added once measured.*
    optimised curve library changed signing time by only 1 %.
 2. **How you compute matters more than what you compute.** The same maths
    with a better number library is 18 times faster. With all tricks
-   together, splitting the key costs 16 ms per signature, fast enough for
+   together, splitting the key costs 16 ms per signature and 4 messages, fast enough for
    a real wallet.
 3. **Security has a price, and leaving it out is dangerous.** Our protocol
    assumes both parties follow the rules ("semi-honest"). Real wallets add
