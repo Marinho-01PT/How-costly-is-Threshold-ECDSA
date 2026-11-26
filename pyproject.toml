@@ -12,7 +12,8 @@ dependencies = ["coincurve>=20"]
 
 [project.optional-dependencies]
 dev = ["pytest"]
-mta = ["phe"]   # only if the MtA variant uses Paillier; decide with the supervisors
+mta = ["phe"]   # only to cross-check our Paillier against the phe library (tests)
+fast = ["gmpy2"]   # building block "big-number arithmetic", variant gmpy2
 
 [tool.setuptools.packages.find]
 where = ["src"]

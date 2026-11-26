@@ -20,7 +20,10 @@ HSG Bachelor project, supervised by Prof. Katerina Mitrokotsa and Nan Cheng.
 | MtA (`mta.py`) | done, as described by the supervisors (semi-honest, no range proofs) |
 | Two-party signing (`protocol.py`) | done, Gennaro & Goldfeder 2018 simplified for two parties, checked against libsecp256k1 |
 | Experiment: Bob leaves out β' in MtA, Alice learns his key share | done in code and tests |
-| Benchmark of two-party signing | first version (`--task sign`) |
+| Benchmark of two-party signing | `--task sign` with any combination of building blocks, `--task matrix` for all of them |
+| Building blocks: libsecp256k1 in the protocol, gmpy2, Paillier CRT decryption and encryption, precomputed r^N, 3072-bit key, binary messages (`config.py`) | done, every variant tested to give a valid signature |
+| Building blocks: MtA reuse, batched messages, two devices over Wi-Fi | open |
+| Interface with one row per building block (study and benchmark mode) | open |
 | Terminal demo: Alice, Bob and an observer, study mode, event log (`demo.py`) | done |
 | Demo UI for MtA and two-party signing, experiment in the visualizer | open |
 
@@ -34,6 +37,32 @@ pytest
 
 `pytest` also runs the JavaScript check in `tests/js/` if Node.js is installed
 (`brew install node`); without Node that one test is skipped.
+
+## Building blocks
+
+Every row of the table "Building blocks and their implementations" on our
+protocol sheet is one field of `Config` in `src/twoparty/config.py`. `Config()`
+is the protocol as we first built it; `--set row=variant` swaps one block.
+
+| Row (`--set`) | Variants (first = original) |
+|---|---|
+| `curve` | `pure`, `libsecp256k1` |
+| `bignum` | `int`, `gmpy2` (`pip install -e ".[fast]"`) |
+| `paillier_dec` | `naive`, `crt` |
+| `paillier_enc` | `naive`, `crt` (Alice only, Bob has no p and q), `precomputed` (r^N offline) |
+| `paillier_bits` | `2048`, `3072` |
+| `wire` | `json`, `binary` |
+| `mask` | `true`, `false` (the experiment without β′) |
+
+```bash
+python -m twoparty --task matrix --rounds 20          # starts its own Bob on localhost
+python -m twoparty --task matrix --peer HOST:5050     # against a Bob elsewhere (Docker, second device)
+```
+
+The matrix runs the original, every variant on its own, and all speed-ups
+together, and writes one CSV row each to `benchmark/results/`: signing time
+(mean, median, p95), signatures per second, verification time, messages and
+bytes per signature, and setup and offline time apart.
 
 ## Run it
 

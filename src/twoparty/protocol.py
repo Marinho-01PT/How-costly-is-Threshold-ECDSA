@@ -23,6 +23,11 @@ show: every function takes an optional hook show(step, values). It is called
 with each step's name and the values computed in it, before that step's
 message is sent: the live demo (demo.py) prints and pauses there, the tests
 record the values. Values from an MtA carry its name, e.g. alpha[k1*d2].
+
+ops: sign_alice and sign_bob take an optional paillier.Ops with the chosen
+variants of the Paillier building blocks (see config.py). Without it they use
+the naive functions, as before. The curve variant is chosen by passing
+ec_libsecp.LIBSECP instead of ec.SECP256K1.
 """
 from typing import Callable, Optional
 
@@ -137,7 +142,7 @@ def _finish(channel, curve: Curve, first: bool, e: int, k_i: int, delta_i: int,
 
 
 def sign_alice(channel, curve: Curve, key: Key, d1: int, msg: bytes,
-               show: Show = None, rng=None) -> tuple[int, int]:
+               show: Show = None, rng=None, ops=None) -> tuple[int, int]:
     """Alice's side. Returns (r, s). rng only for reproducible demos and tests."""
     n = curve.n
     e = message_hash(curve, msg)
@@ -153,12 +158,12 @@ def sign_alice(channel, curve: Curve, key: Key, d1: int, msg: bytes,
         # Same order as in sign_bob. Alice always has the a side.
         alpha = {}
         for name, a in (("k1*gamma2", k1), ("gamma1*k2", gamma1)):
-            alpha[name] = mta.mta_alice(channel, key, a, n, _mta_show(show, name))
+            alpha[name] = mta.mta_alice(channel, key, a, n, _mta_show(show, name), ops)
         # k*gamma = k1*gamma1 + k2*gamma2 + k1*gamma2 + gamma1*k2: own term + MtA shares
         delta1 = (k1 * gamma1 + alpha["k1*gamma2"] + alpha["gamma1*k2"]) % n
         _show(show, "2. delta1 = k1*gamma1 + alpha[k1*gamma2] + alpha[gamma1*k2]", delta1=delta1)
         for name, a in (("k1*d2", k1), ("d1*k2", d1)):
-            alpha[name] = mta.mta_alice(channel, key, a, n, _mta_show(show, name))
+            alpha[name] = mta.mta_alice(channel, key, a, n, _mta_show(show, name), ops)
         sigma1 = (k1 * d1 + alpha["k1*d2"] + alpha["d1*k2"]) % n
         _show(show, "3. sigma1 = k1*d1 + alpha[k1*d2] + alpha[d1*k2]", sigma1=sigma1)
         sig = _finish(channel, curve, True, e, k1, delta1, sigma1,
@@ -169,7 +174,7 @@ def sign_alice(channel, curve: Curve, key: Key, d1: int, msg: bytes,
 
 def sign_bob(channel, curve: Curve, N: int, d2: int, msg: bytes,
              show: Show = None, rng=None, mask: bool = True,
-             mask_bits: int = mta.MASK_BITS) -> tuple[int, int]:
+             mask_bits: int = mta.MASK_BITS, ops=None) -> tuple[int, int]:
     """Bob's side. Returns (r, s).
 
     mask=False leaves out beta' in every MtA: the experiment in which Alice
@@ -189,11 +194,11 @@ def sign_bob(channel, curve: Curve, N: int, d2: int, msg: bytes,
         _show(show, "1. received Gamma1", Gamma1=Gamma1)
         beta = {}
         for name, b in (("k1*gamma2", gamma2), ("gamma1*k2", k2)):
-            beta[name] = mta.mta_bob(channel, N, b, n, mask, _mta_show(show, name), mask_bits)
+            beta[name] = mta.mta_bob(channel, N, b, n, mask, _mta_show(show, name), mask_bits, ops)
         delta2 = (k2 * gamma2 + beta["k1*gamma2"] + beta["gamma1*k2"]) % n
         _show(show, "2. delta2 = k2*gamma2 + beta[k1*gamma2] + beta[gamma1*k2]", delta2=delta2)
         for name, b in (("k1*d2", d2), ("d1*k2", k2)):
-            beta[name] = mta.mta_bob(channel, N, b, n, mask, _mta_show(show, name), mask_bits)
+            beta[name] = mta.mta_bob(channel, N, b, n, mask, _mta_show(show, name), mask_bits, ops)
         sigma2 = (k2 * d2 + beta["k1*d2"] + beta["d1*k2"]) % n
         _show(show, "3. sigma2 = k2*d2 + beta[k1*d2] + beta[d1*k2]", sigma2=sigma2)
         sig = _finish(channel, curve, False, e, k2, delta2, sigma2,

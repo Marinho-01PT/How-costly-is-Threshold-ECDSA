@@ -5,14 +5,26 @@ Examples (same code in every variant, only the address changes):
   python -m twoparty --role alice --peer   127.0.0.1:5050 --task echo --rounds 200
   python -m twoparty --role alice --peer   127.0.0.1:5050 --task sign --curve toy --rounds 50
   python -m twoparty --task baseline --rounds 200
+
+Building blocks (see config.py), one --set per row that differs from the original:
+  python -m twoparty --role alice --peer 127.0.0.1:5050 --task sign \
+      --set paillier_dec=crt --set bignum=gmpy2 --rounds 20
+Benchmark matrix: the original, every variant on its own, all speed-ups together.
+Starts its own Bob on localhost unless --peer is given:
+  python -m twoparty --task matrix --rounds 10
 """
 import argparse
 import datetime
 import json
 import platform
+import socket
+import subprocess
 import sys
+import time
+from dataclasses import replace
 
-from . import bench, net
+from . import bench, config, net, paillier
+from .config import Config
 from .ec import CURVES
 
 
@@ -26,7 +38,9 @@ def main(argv=None) -> int:
     p.add_argument("--role", choices=["alice", "bob"])
     p.add_argument("--listen", help="host:port to wait on (Bob)")
     p.add_argument("--peer", help="host:port of the other party (Alice)")
-    p.add_argument("--task", choices=["echo", "baseline", "sign"], default="echo")
+    p.add_argument("--task", choices=["echo", "baseline", "sign", "matrix"], default="echo")
+    p.add_argument("--set", action="append", default=[], metavar="ROW=VARIANT",
+                   help="pick a building-block variant, e.g. paillier_enc=precomputed")
     p.add_argument("--rounds", type=int, default=100)
     p.add_argument("--payload", type=int, default=64, help="echo payload in bytes")
     p.add_argument("--curve", choices=sorted(CURVES), default="secp256k1",
@@ -39,6 +53,8 @@ def main(argv=None) -> int:
     if a.task == "baseline":
         report(a, bench.baseline(a.rounds), None)
         return 0
+    if a.task == "matrix":
+        return run_matrix(a)
     if a.role == "bob":
         return run_bob(a)
     if a.role == "alice":
@@ -57,25 +73,105 @@ def run_bob(a) -> int:
         if hello["task"] == "echo":
             bench.echo_bob(ch)
         elif hello["task"] == "sign":
-            bench.sign_bob(ch, CURVES[hello["curve"]])
+            cfg = Config.from_dict(hello.get("config"))
+            ch.set_format(cfg.wire)
+            bench.sign_bob(ch, CURVES[hello["curve"]], cfg, hello.get("rounds", 0))
         ch.close()
         if a.once:
             return 0
 
 
+def parse_sets(items: list[str]) -> Config:
+    """--set row=variant ... -> Config. Numbers and True/False are converted."""
+    d = {}
+    for item in items:
+        k, _, v = item.partition("=")
+        d[k] = {"true": True, "false": False}.get(v.lower(), int(v) if v.isdigit() else v)
+    unknown = set(d) - set(Config.__dataclass_fields__)
+    if unknown:
+        sys.exit(f"unknown building block(s): {', '.join(sorted(unknown))}")
+    return Config(**d)
+
+
+def sign_session(peer: tuple[str, int], curve: str, rounds: int, cfg: Config,
+                 key=None) -> dict:
+    """One connection to Bob: setup, then rounds signatures with cfg."""
+    ch = net.connect(*peer)
+    try:
+        ch.send({"task": "sign", "curve": curve, "rounds": rounds, "config": cfg.to_dict()})
+        ch.set_format(cfg.wire)
+        return bench.sign_alice(ch, CURVES[curve], rounds, cfg, key)
+    finally:
+        ch.close()
+
+
 def run_alice(a) -> int:
     if not a.peer:
         sys.exit("Alice needs --peer host:port")
+    if a.task == "sign":
+        row = sign_session(addr(a.peer), a.curve, a.rounds, parse_sets(a.set))
+        report_row(a, row)
+        return 0
     ch = net.connect(*addr(a.peer))
     ch.send({"task": a.task, "curve": a.curve})
-    if a.task == "echo":
-        samples = bench.echo_alice(ch, a.rounds, a.payload)
-        report(a, samples, ch.stats())
-    else:
-        samples, setup_ms = bench.sign_alice(ch, CURVES[a.curve], a.rounds)
-        report(a, samples, ch.stats(), {"curve": a.curve, "setup_ms": round(setup_ms, 4)})
+    samples = bench.echo_alice(ch, a.rounds, a.payload)
+    report(a, samples, ch.stats())
     ch.close()
     return 0
+
+
+def _free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def run_matrix(a) -> int:
+    """The original protocol, every variant on its own, then all speed-ups.
+
+    One Paillier key per size is made first and reused, so the rows compare
+    the signing, not the luck of the prime search (keygen_ms is reported once).
+    """
+    configs = config.variants_one_at_a_time() + [config.fastest()]
+    if a.curve != "secp256k1":  # libsecp256k1 only knows secp256k1
+        configs = list(dict.fromkeys(replace(c, curve="pure") for c in configs))
+    for item in a.set:  # --set here filters: only rows with these values
+        k, _, v = item.partition("=")
+        configs = [c for c in configs if str(getattr(c, k)).lower() == v.lower()]
+    bob = None
+    if a.peer:
+        peer = addr(a.peer)
+    else:
+        peer = ("127.0.0.1", _free_port())
+        bob = subprocess.Popen([sys.executable, "-m", "twoparty", "--role", "bob",
+                                "--listen", f"{peer[0]}:{peer[1]}"],
+                               stdout=subprocess.DEVNULL)
+    out = a.out or f"benchmark/results/matrix-{datetime.date.today()}.csv"
+    keys = {}
+    try:
+        for i, cfg in enumerate(configs, 1):
+            bits = bench.paillier_bits(CURVES[a.curve], cfg)
+            if bits not in keys:
+                t0 = time.perf_counter()
+                keys[bits] = paillier.keygen(bits)
+                print(f"# Paillier key {bits} bit: {(time.perf_counter() - t0):.1f} s", flush=True)
+            print(f"# [{i}/{len(configs)}] {cfg.label()}", flush=True)
+            row = sign_session(peer, a.curve, a.rounds, cfg, keys[bits])
+            a.out = out
+            report_row(a, row)
+    finally:
+        if bob:
+            bob.terminate()
+    print(f"# written to {out}")
+    return 0
+
+
+def report_row(a, row: dict) -> None:
+    row = {"time": datetime.datetime.now().isoformat(timespec="seconds"),
+           "label": a.label, "task": a.task, "host": platform.node(), **row}
+    print(json.dumps(row), flush=True)
+    if a.out:
+        bench.append_csv(a.out, row)
 
 
 def report(a, samples, stats, extra=None) -> None:
