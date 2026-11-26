@@ -50,10 +50,12 @@ def test_study_toy_curve(server):
     status, t = post(server + "/api/study", {"config": {}, "curve": "toy", "message": "1 coin to Carol"})
     assert status == 200 and t["valid"] is True
     msgs = [e for e in t["events"] if e["kind"] == "message"]
-    assert t["signing_messages"] == 14 and len(msgs) == 16      # 14 + 2 for the setup
+    # 14 per signature, + 12 per restart (delta, r or s = 0 happens on the toy curve), + 2 setup
+    restarts, rest = divmod(t["signing_messages"] - 14, 12)
+    assert rest == 0 and restarts >= 0 and len(msgs) == t["signing_messages"] + 2
     assert {e["party"] for e in t["events"]} == {"alice", "bob", "verifier"}
     enc = [e for e in t["events"] if e["kind"] == "step" and "Enc(a)" in e["step"]]
-    assert len(enc) == 4 and all("paillier_enc" in e["rows"] for e in enc)
+    assert len(enc) == 4 * (restarts + 1) and all("paillier_enc" in e["rows"] for e in enc)
     assert all(isinstance(e["spent_ms"], float) for e in t["events"])
 
 
