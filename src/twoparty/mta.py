@@ -88,18 +88,22 @@ def _show(show, step: str, **values) -> None:
         show(step, values)
 
 
-def mta_alice(channel, key: Key, a: int, n: int, show=None, ops=None) -> int:
+def mta_alice(channel, key: Key, a: int, n: int, show=None, ops=None,
+              send: bool = True) -> int:
     """Alice's side. Returns alpha. Sends one message, receives one.
 
     ops: Alice's paillier.Ops (the chosen variants). None: the naive functions.
+    send=False: Bob already has Enc(a) from an earlier message (MtA reuse),
+    so Alice only receives c_B and decrypts.
     """
-    if ops is None:
-        c_A = alice_encrypt(key.N, a, n)
-    else:
-        _check_input(a, n)
-        c_A = ops.encrypt(a)
-    _show(show, "send c_A = Enc(a)", a=a, c_A=c_A)
-    channel.send({"c_A": c_A})
+    if send:
+        if ops is None:
+            c_A = alice_encrypt(key.N, a, n)
+        else:
+            _check_input(a, n)
+            c_A = ops.encrypt(a)
+        _show(show, "send c_A = Enc(a)", a=a, c_A=c_A)
+        channel.send({"c_A": c_A})
     c_B = channel.recv()["c_B"]
     plain = paillier.decrypt(key, c_B) if ops is None else ops.decrypt(c_B)  # a*b + beta' as a whole number
     alpha = plain % n
@@ -108,9 +112,13 @@ def mta_alice(channel, key: Key, a: int, n: int, show=None, ops=None) -> int:
 
 
 def mta_bob(channel, N: int, b: int, n: int, mask: bool = True, show=None,
-            mask_bits: int = MASK_BITS, ops=None) -> int:
-    """Bob's side. Returns beta. mask=False only for the experiment."""
-    c_A = channel.recv()["c_A"]
+            mask_bits: int = MASK_BITS, ops=None, c_A: int | None = None) -> int:
+    """Bob's side. Returns beta. mask=False only for the experiment.
+
+    c_A given: Bob already holds Enc(a) (MtA reuse) and receives nothing.
+    """
+    if c_A is None:
+        c_A = channel.recv()["c_A"]
     c_B, beta, beta_prime = bob_respond(N, c_A, b, n, mask, mask_bits, ops)
     _show(show, "send c_B = c_A^b * Enc(beta'), keep beta = -beta' mod n",
           c_A=c_A, b=b, beta_prime=beta_prime, c_B=c_B, beta=beta)
