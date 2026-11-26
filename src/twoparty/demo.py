@@ -18,6 +18,16 @@ every message on. Once both are there, it asks how to run the session:
 
 --mode, --pace and --experiment answer these questions up front.
 
+Two laptops on the same Wi-Fi, no addresses to type:
+
+    python -m twoparty.demo lan                  # first laptop: hosts, prints a code
+    python -m twoparty.demo lan --code 4821      # second laptop: joins with that code
+
+The host asks the questions, then runs the observer (quietly, as the relay)
+and Bob; the other laptop is Alice. --role alice swaps that. --show-network
+also prints the network view on the host. Pace "all" means Enter on both
+laptops; "observer" is not offered, since nobody sits at the relay.
+
 Alice and Bob print every value they compute, the observer only what the
 network sees. With --events FILE the observer also writes everything,
 Alice's and Bob's inside view included, as JSON lines (values typed as in
@@ -29,11 +39,12 @@ Not port 5000 on macOS: AirPlay Receiver listens there and never answers.
 import argparse
 import json
 import select
+import threading
 import time
 
 from coincurve import PublicKey
 
-from . import ecdsa_baseline, ecdsa_pure, mta, net, protocol
+from . import ecdsa_baseline, ecdsa_pure, lan, mta, net, protocol
 from .ec import CURVES, SECP256K1
 from .trace import encode
 
@@ -371,9 +382,21 @@ def choose(question: str, options: dict, given) -> str:
             return ans
 
 
-def run_observer(a) -> int:
-    srv = net.listen(*addr(a.listen))
-    print(f"[network] waiting for Alice and Bob on {a.listen} ...", flush=True)
+def ask_settings(a, questions=QUESTIONS) -> dict:
+    answers = {key: choose(q, opts, getattr(a, key)) for key, q, opts in questions}
+    return {"mode": answers["mode"], **MODES[answers["mode"]], "pace": answers["pace"],
+            "experiment": answers["experiment"] == "yes", "events": bool(a.events)}
+
+
+def run_observer(a, settings=None, quiet=False, on_ready=None, srv=None) -> int:
+    """The relay. settings given: no questions. quiet: no output, no waiting
+    (the LAN host). on_ready() is called once Alice and Bob are both there."""
+    def say(*args, **kw):
+        if not quiet:
+            print(*args, **kw)
+    if srv is None:
+        srv = net.listen(*addr(a.listen))
+    say(f"[network] waiting for Alice and Bob on {a.listen} ...", flush=True)
     peers = {}
     while len(peers) < 2:
         ch = net.accept(srv)
@@ -383,18 +406,19 @@ def run_observer(a) -> int:
             ch.close()
             continue
         peers[role] = ch
-        print(f"[network] {role.capitalize()} is connected.", flush=True)
+        say(f"[network] {role.capitalize()} is connected.", flush=True)
     srv.close()
+    if on_ready:
+        on_ready()
 
-    answers = {key: choose(q, opts, getattr(a, key)) for key, q, opts in QUESTIONS}
-    settings = {"mode": answers["mode"], **MODES[answers["mode"]], "pace": answers["pace"],
-                "experiment": answers["experiment"] == "yes", "events": bool(a.events)}
+    if settings is None:
+        settings = ask_settings(a)
     log = EventLog(a.events)
     log.write("network", "settings", {k: encode(v) for k, v in settings.items()})
     for ch in peers.values():
         ch.send({"settings": settings})
-    print("[network] settings sent, Alice and Bob talk through me now."
-          + (f" Event log: {a.events}" if a.events else ""), flush=True)
+    say("[network] settings sent, Alice and Bob talk through me now."
+        + (f" Event log: {a.events}" if a.events else ""), flush=True)
 
     alice, bob = peers["alice"], peers["bob"]
     route = {alice.sock: (alice, bob, "Alice", "Bob"), bob.sock: (bob, alice, "Bob", "Alice")}
@@ -411,28 +435,104 @@ def run_observer(a) -> int:
                     continue
                 count += 1
                 note = wire.note(sender, msg)
-                print(f"\n[network] #{count} {sender} -> {receiver}: {note}")
-                print_values(msg, a.full)
                 log.write("network", f"{sender} -> {receiver}: {note}",
                           {k: _typed(v) for k, v in msg.items()})
-                known = wire.what_we_know()
-                if known and ("s" in msg or "delta" in msg):
-                    print("    anyone on the network can now compute:")
-                    print_values(known, a.full)
-                if settings["pace"] != "run":
-                    input(f"    (Enter: pass on to {receiver}) ")
+                if not quiet:
+                    print(f"\n[network] #{count} {sender} -> {receiver}: {note}")
+                    print_values(msg, a.full)
+                    known = wire.what_we_know()
+                    if known and ("s" in msg or "delta" in msg):
+                        print("    anyone on the network can now compute:")
+                        print_values(known, a.full)
+                    # On the LAN host nobody sits at the relay: Alice and Bob wait instead.
+                    if settings["pace"] != "run" and not getattr(a, "lan_host", False):
+                        input(f"    (Enter: pass on to {receiver}) ")
                 dst.send(msg)
     except ConnectionError:
-        print("\n[network] connection closed.")
+        say("\n[network] connection closed.")
     alice.close()
     bob.close()
     return 0
 
 
+# ---- two laptops on the same Wi-Fi --------------------------------------------
+
+LAN_QUESTIONS = [(k, q, {o: d for o, d in opts.items() if o != "observer"})
+                 if k == "pace" else (k, q, opts) for k, q, opts in QUESTIONS]
+for _k, _q, _opts in LAN_QUESTIONS:
+    if _k == "pace":
+        _opts["all"] = "Enter on both laptops"
+
+
+def run_lan(a) -> int:
+    """Host (no --code, or --host): relay + own role, announce a code.
+    Join (--code): find the host with that code and play the other role."""
+    if a.code and not a.host:
+        return lan_join(a)
+    return lan_host(a)
+
+
+def lan_host(a) -> int:
+    role = a.lan_role or "bob"
+    other = "alice" if role == "bob" else "bob"
+    code = a.code or lan.new_code()
+    ip = lan.local_ip()
+    if a.pace == "observer":
+        raise SystemExit("--pace observer makes no sense with two laptops: use all or run")
+    settings = ask_settings(a, LAN_QUESTIONS)
+    srv = net.listen("0.0.0.0", a.port)  # every interface, so the other laptop gets in
+    port = srv.getsockname()[1]
+    beacon = lan.Beacon(code, "demo", port, name=a.name or "", role=other,
+                        targets=[a.beacon_addr] if a.beacon_addr else None,
+                        beacon_port=a.beacon_port).start()
+    print(f"\n  Pairing code: {code}")
+    print(f"  On the other laptop:  python -m twoparty.demo lan --code {code}")
+    print(f"  (or by address:       python -m twoparty.demo {other} --hub {ip}:{port})")
+    print(f"  This laptop plays {role.capitalize()}, the other one {other.capitalize()}.\n",
+          flush=True)
+    a.lan_host = True
+    a.listen = f"0.0.0.0:{port}"
+    relay = threading.Thread(target=run_observer, daemon=True,
+                             args=(a, settings, not a.show_network, beacon.stop, srv))
+    relay.start()
+    a.hub = f"127.0.0.1:{port}"
+    try:
+        return run_alice(a) if role == "alice" else run_bob(a)
+    finally:
+        beacon.stop()
+        relay.join(timeout=5)
+
+
+def lan_join(a) -> int:
+    print(f"[lan] looking for code {a.code} on this network "
+          f"(up to {a.timeout:.0f} s, this laptop: {lan.local_ip()}) ...", flush=True)
+    found = lan.find(a.code, "demo", a.timeout, a.beacon_port)
+    if found is None:
+        print(lan.HINT)
+        return 1
+    role = a.lan_role or found.get("role") or "alice"
+    who = f" ({found['name']})" if found.get("name") else ""
+    print(f"[lan] found the host{who} at {found['host']}:{found['port']}, "
+          f"this laptop plays {role.capitalize()}.", flush=True)
+    a.hub = f"{found['host']}:{found['port']}"
+    return run_alice(a) if role == "alice" else run_bob(a)
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="python -m twoparty.demo", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("role", choices=["observer", "alice", "bob"])
+    p.add_argument("role", choices=["observer", "alice", "bob", "lan"])
+    p.add_argument("--code", help="lan: pairing code of the host (join), or the code to use (--host)")
+    p.add_argument("--host", action="store_true", help="lan: host even though --code is given")
+    p.add_argument("--as", dest="lan_role", choices=["alice", "bob"],
+                   help="lan: which role this laptop plays (host default: bob)")
+    p.add_argument("--name", help="lan: your name, shown to the other laptop")
+    p.add_argument("--port", type=int, default=5050, help="lan host: TCP port (0 = any free)")
+    p.add_argument("--timeout", type=float, default=30.0, help="lan join: seconds to search")
+    p.add_argument("--show-network", action="store_true",
+                   help="lan host: also print what the network sees")
+    p.add_argument("--beacon-port", type=int, default=lan.BEACON_PORT, help=argparse.SUPPRESS)
+    p.add_argument("--beacon-addr", help=argparse.SUPPRESS)  # tests: send beacons here only
     p.add_argument("--listen", help="observer: host:port to wait on, e.g. 127.0.0.1:5050")
     p.add_argument("--hub", help="alice, bob: host:port of the observer")
     p.add_argument("--mode", choices=list(MODES), help="observer: skip the question")
@@ -442,6 +542,8 @@ def main(argv=None) -> int:
     p.add_argument("--message", help="alice: sign this one message, then quit")
     p.add_argument("--full", action="store_true", help="print long numbers in full")
     a = p.parse_args(argv)
+    if a.role == "lan":
+        return run_lan(a)
     if a.role == "observer":
         if not a.listen:
             p.error("the observer needs --listen host:port")
