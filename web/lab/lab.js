@@ -18,7 +18,7 @@ function el(tag, attrs = {}, ...children) {
 const state = { rows: [], curves: [], curve: "toy", config: {}, trace: null, at: 0 };
 
 const FAST = { curve: "libsecp256k1", bignum: "gmpy2", paillier_dec: "crt",
-  paillier_enc: "precomputed", wire: "binary" };
+  paillier_enc: "precomputed", wire: "binary", mta: "reuse", flow: "batched" };
 const SHORT = { curve: "secp256k1 only", paillier_bits: "secp256k1 only" };
 const PARTY = { alice: "Alice", bob: "Bob", verifier: "Verifier" };
 const key = (v) => JSON.stringify(v);
@@ -155,10 +155,11 @@ function renderStudy() {
   $("#summary").textContent =
     `${t.valid ? "Signature valid" : "SIGNATURE INVALID"} (checked against the public key). ` +
     `${t.signing_messages} messages for the signature plus 2 for the setup, ${t.bytes} bytes, ` +
-    `${ms(t.total_ms)} ms from setup to signature. Curve ${t.curve}, configuration ${t.label}.`;
+    `${ms(t.total_ms)} ms from setup to signature. Curve ${t.curve}, configuration ${t.label}. ` +
+    `Bob: ${t.bob}.`;
   $("#timeline tbody").replaceChildren(...t.events.map((e, i) => el("tr", { "data-i": i, onclick: () => go(i) },
     el("td", {}, String(i + 1)),
-    el("td", {}, PARTY[e.party]),
+    el("td", {}, PARTY[e.party] + (e.remote ? " (partner)" : "")),
     el("td", {}, e.kind === "message" ? `sends ${e.keys.join(", ")} to ${PARTY[e.to]}` : e.step),
     el("td", {}, `${ms(e.spent_ms)} ms`))));
   go(0);
@@ -294,6 +295,83 @@ function drawResults() {
   }));
 }
 
+// ---- partner on the same Wi-Fi -----------------------------------------------
+let pairTimer = null;
+
+async function pairCall(path, body) {
+  const res = await fetch(path, body === undefined ? {} : {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function showPair(st) {
+  const status = $("#pair-status");
+  status.className = "status";
+  $("#pair-host").hidden = st.mode !== "host";
+  if (st.mode === "host") {
+    $("#pair-code").textContent = st.code;
+    $("#pair-me").textContent = `${st.name}, ${st.ip}:${st.port}`;
+    status.textContent = "Waiting for the partner. While a partner is connected, this laptop answers as Bob.";
+    $("#pair-log tbody").replaceChildren(...(st.log.length ? st.log.slice().reverse().map((x) =>
+      el("tr", {}, el("td", {}, x.time), el("td", {}, x.from), el("td", {}, x.error ? `${x.what || x.task}: ${x.error}` : x.what)))
+      : [el("tr", {}, el("td", { colspan: 3, class: "note" }, "no session yet"))]));
+    const last = st.last_study;
+    $("#bob-last").hidden = !last;
+    if (last) {
+      $("#bob-last-info").textContent = `Message "${last.message}", curve ${last.curve}, configuration ${last.label}, Alice at ${last.from}.`;
+      $("#bob-steps tbody").replaceChildren(...last.steps.map((x, i) =>
+        el("tr", {}, el("td", {}, String(i + 1)), el("td", {}, x.step), el("td", {}, `${ms(x.spent_ms)} ms`))));
+    }
+  } else if (st.mode === "joined") {
+    status.textContent = `Connected. Bob is ${st.partner} (${st.peer}). Study mode and benchmark now run against that laptop.`;
+    $("#peer").value = "";
+    $("#peer").placeholder = `empty = partner ${st.partner}`;
+  } else {
+    status.textContent = "";
+    $("#peer").placeholder = "empty = local Bob";
+  }
+}
+
+async function setPairMode(mode) {
+  clearInterval(pairTimer);
+  $("#pair-join").hidden = mode !== "join";
+  try {
+    if (mode === "host") {
+      showPair(await pairCall("/api/pair/host", {}));
+      pairTimer = setInterval(async () => {
+        try { showPair(await pairCall("/api/pair")); } catch { /* server gone */ }
+      }, 1500);
+    } else {
+      showPair(await pairCall("/api/pair/leave", {}));
+      if (mode === "join") { $("#pair-status").textContent = "Type the code shown on your partner's laptop."; $("#join-code").focus(); }
+    }
+  } catch (e) {
+    $("#pair-status").className = "status error";
+    $("#pair-status").textContent = `Error: ${e.message}`;
+  }
+}
+
+for (const r of document.querySelectorAll('input[name="pairmode"]'))
+  r.addEventListener("change", (e) => setPairMode(e.target.value));
+
+$("#pair-join").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const btn = $("#join-run");
+  btn.disabled = true;
+  $("#pair-status").className = "status";
+  $("#pair-status").textContent = "Looking for the partner on this network (up to 15 s)...";
+  try {
+    showPair(await pairCall("/api/pair/join", { code: $("#join-code").value }));
+  } catch (e) {
+    $("#pair-status").className = "status error pre";
+    $("#pair-status").textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 // ---- start -----------------------------------------------------------------
 (async () => {
   const data = await (await fetch("/api/rows")).json();
@@ -303,4 +381,12 @@ function drawResults() {
   $("#curve").replaceChildren(...state.curves.map((c) => el("option", { value: c.name, selected: c.name === state.curve },
     c.name === "toy" ? `toy (${c.bits} bit, small numbers)` : `${c.name} (${c.bits} bit)`)));
   renderRows();
+  try {   // after a page reload: show the pairing the server still has
+    const st = await pairCall("/api/pair");
+    if (st.mode !== "alone") {
+      document.querySelector(`input[name="pairmode"][value="${st.mode === "host" ? "host" : "join"}"]`).checked = true;
+      $("#pair-join").hidden = st.mode !== "joined";
+      if (st.mode === "host") setPairMode("host"); else showPair(st);
+    }
+  } catch { /* older server */ }
 })();

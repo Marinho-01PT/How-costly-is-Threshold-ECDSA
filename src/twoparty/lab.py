@@ -138,8 +138,10 @@ class _Recorder:
 class _RecChannel:
     """A net.Channel that also reports every message it sends."""
 
-    def __init__(self, ch: net.Channel, party: str, rec: _Recorder, rows_: list[str]):
+    def __init__(self, ch: net.Channel, party: str, rec: _Recorder, rows_: list[str],
+                 mark_recv: bool = False):
         self.ch, self.party, self.rec, self.rows = ch, party, rec, rows_
+        self.mark_recv = mark_recv  # remote study: lets merge() put both sides in order
 
     def send(self, obj):
         before = self.ch.sent_bytes
@@ -149,7 +151,10 @@ class _RecChannel:
                      values=_jsonable(obj), rows=self.rows)
 
     def recv(self):
-        return self.ch.recv()
+        obj = self.ch.recv()
+        if self.mark_recv:
+            self.rec.add(self.party, "recv")
+        return obj
 
     def __getattr__(self, name):
         return getattr(self.ch, name)
@@ -167,64 +172,158 @@ def paillier_key(bits: int) -> paillier.Key:
         return _KEYS[bits]
 
 
-def study(cfg: Config, curve_name: str = "toy", message: str = "Alice and Bob send 1 coin to Carol") -> dict:
-    """One real signature, both parties in this process, every step recorded."""
+def _bob_side(raw: net.Channel, cfg: Config, pcurve, msg: bytes, rec: _Recorder,
+              mark_recv: bool = False) -> tuple[tuple[int, int], int]:
+    """Bob's part of one recorded signature. Returns (signature, d2)."""
+    ch = _RecChannel(raw, "bob", rec, ["wire", "flow"], mark_recv)
+    reuse, batched = cfg.mta == "reuse", cfg.flow == "batched"
+    c_d1 = None
+    if reuse:
+        N, d2, _, c_d1 = protocol.setup_bob(ch, pcurve, show=rec.hook("bob"), reuse=True)
+    else:
+        N, d2, _ = protocol.setup_bob(ch, pcurve, show=rec.hook("bob"))
+    ops = paillier.ops_for(cfg, N)
+    if cfg.paillier_enc == "precomputed":
+        ops.precompute(4)
+    sig = protocol.sign_bob(ch, pcurve, N, d2, msg, show=rec.hook("bob"), mask=cfg.mask,
+                            ops=ops, reuse=reuse, batched=batched, c_d1=c_d1)
+    return sig, d2
+
+
+def _alice_side(raw: net.Channel, cfg: Config, pcurve, key, msg: bytes, rec: _Recorder,
+                mark_recv: bool = False):
+    """Alice's part. Returns (signature, public key Q, milliseconds)."""
+    ch = _RecChannel(raw, "alice", rec, ["wire", "flow"], mark_recv)
+    reuse, batched = cfg.mta == "reuse", cfg.flow == "batched"
+    t_start = time.perf_counter()
+    key, d1, Q = protocol.setup_alice(ch, pcurve, key=key, show=rec.hook("alice"), reuse=reuse)
+    ops = paillier.ops_for(cfg, key.N, key)
+    if cfg.paillier_enc == "precomputed":
+        ops.precompute(4)
+    sig = protocol.sign_alice(ch, pcurve, key, d1, msg, show=rec.hook("alice"), ops=ops,
+                              reuse=reuse, batched=batched)
+    return sig, Q, (time.perf_counter() - t_start) * 1000
+
+
+def merge(alice: list[dict], bob: list[dict]) -> list[dict]:
+    """Put the events of two machines in an order that respects every message.
+
+    Their clocks are not comparable, so time cannot order them. Instead each
+    side marks every message it receives ("recv"); a side may only go past
+    its k-th recv once the other side's k-th message is placed. The markers
+    are dropped from the result.
+    """
+    queues = {"alice": list(alice), "bob": list(bob)}
+    other = {"alice": "bob", "bob": "alice"}
+    sent = {"alice": 0, "bob": 0}
+    got = {"alice": 0, "bob": 0}
+    out = []
+    while queues["alice"] or queues["bob"]:
+        moved = False
+        for party in ("alice", "bob"):
+            q = queues[party]
+            while q:
+                e = q[0]
+                if e["kind"] == "recv":
+                    if sent[other[party]] <= got[party]:
+                        break           # wait for the other side's message
+                    got[party] += 1
+                    q.pop(0)
+                    moved = True
+                    continue
+                if e["kind"] == "message":
+                    sent[party] += 1
+                out.append(q.pop(0))
+                moved = True
+        if not moved:                   # should not happen; keep everything
+            out += queues["alice"] + queues["bob"]
+            break
+    return [e for e in out if e["kind"] != "recv"]
+
+
+def serve_study(raw: net.Channel, hello: dict) -> dict:
+    """Bob's side of a study run for a partner on another machine (pairing.py).
+
+    Runs one recorded signature as Bob, then sends his events back so the
+    partner's page can show both sides. Returns a short summary for Bob's page.
+    """
+    cfg = Config.from_dict(hello.get("config"))
+    curve = CURVES[hello["curve"]]
+    pcurve = ec_libsecp.resolve(curve, cfg.curve)
+    raw.set_format(cfg.wire)
+    rec = _Recorder()
+    sig, d2 = _bob_side(raw, cfg, pcurve, hello["message"].encode(), rec, mark_recv=True)
+    for e in rec.events:
+        e["t"] = round((e["t"] - rec.t0) * 1000, 3)
+    # d2 only goes back in the experiment, to prove that Alice really stole it.
+    raw.send({"events": rec.events, "d2": None if cfg.mask else str(d2)})
+    return {"label": cfg.label(), "curve": hello["curve"], "message": hello["message"],
+            "signature": _jsonable(sig),
+            "steps": [{"step": e.get("step") or f"sends {', '.join(e['keys'])} to Alice",
+                       "spent_ms": e["spent_ms"]}
+                      for e in rec.events if e["kind"] in ("step", "message")]}
+
+
+def study(cfg: Config, curve_name: str = "toy", message: str = "Alice and Bob send 1 coin to Carol",
+          peer: tuple[str, int] | None = None, partner: str = "") -> dict:
+    """One real signature, every step of both parties recorded.
+
+    Without peer both parties run in this process. With peer, Bob is the
+    partner's laptop (pairing.py): it signs as Bob and sends its events back.
+    """
     curve = CURVES[curve_name]
     cfg.check_curve(curve_name)
     pcurve = ec_libsecp.resolve(curve, cfg.curve)
     msg = message.encode()
     key = paillier_key(bench.paillier_bits(curve, cfg))
     rec = _Recorder()
-    wire_rows = ["wire", "flow"]
-    srv = net.listen("127.0.0.1", 0)
-    port = srv.getsockname()[1]
     out: dict = {}
+    if peer is None:
+        srv = net.listen("127.0.0.1", 0)
+        port = srv.getsockname()[1]
 
-    reuse, batched = cfg.mta == "reuse", cfg.flow == "batched"
+        def bob_thread():
+            raw_b = net.accept(srv)
+            raw_b.set_format(cfg.wire)
+            try:
+                out["bob"], out["d2"] = _bob_side(raw_b, cfg, pcurve, msg, rec)
+            except BaseException as exc:  # reported on Alice's side
+                out["error"] = exc
+            finally:
+                raw_b.close()
 
-    def bob_side():
-        raw = net.accept(srv)
+        t = threading.Thread(target=bob_thread, daemon=True)
+        t.start()
+        raw = net.connect("127.0.0.1", port)
         raw.set_format(cfg.wire)
-        ch = _RecChannel(raw, "bob", rec, wire_rows)
         try:
-            c_d1 = None
-            if reuse:
-                N, d2, Q, c_d1 = protocol.setup_bob(ch, pcurve, show=rec.hook("bob"), reuse=True)
-            else:
-                N, d2, Q = protocol.setup_bob(ch, pcurve, show=rec.hook("bob"))
-            ops = paillier.ops_for(cfg, N)
-            if cfg.paillier_enc == "precomputed":
-                ops.precompute(4)
-            out["bob"] = protocol.sign_bob(ch, pcurve, N, d2, msg, show=rec.hook("bob"),
-                                           mask=cfg.mask, ops=ops, reuse=reuse,
-                                           batched=batched, c_d1=c_d1)
-            out["d2"] = d2
-        except BaseException as exc:  # reported on Alice's side
-            out["error"] = exc
+            sig, Q, total_ms = _alice_side(raw, cfg, pcurve, key, msg, rec)
         finally:
             raw.close()
-
-    t = threading.Thread(target=bob_side, daemon=True)
-    t.start()
-    raw = net.connect("127.0.0.1", port)
-    raw.set_format(cfg.wire)
-    ch = _RecChannel(raw, "alice", rec, wire_rows)
-    try:
-        t_start = time.perf_counter()
-        key, d1, Q = protocol.setup_alice(ch, pcurve, key=key, show=rec.hook("alice"),
-                                          reuse=reuse)
-        ops = paillier.ops_for(cfg, key.N, key)
-        if cfg.paillier_enc == "precomputed":
-            ops.precompute(4)
-        sig = protocol.sign_alice(ch, pcurve, key, d1, msg, show=rec.hook("alice"), ops=ops,
-                                  reuse=reuse, batched=batched)
-        total_ms = (time.perf_counter() - t_start) * 1000
-    finally:
-        raw.close()
-        t.join(timeout=60)
-        srv.close()
-    if "error" in out:
-        raise out["error"]
+            t.join(timeout=60)
+            srv.close()
+        if "error" in out:
+            raise out["error"]
+        events = sorted(rec.events, key=lambda e: e["t"])
+    else:
+        raw = net.connect(*peer)
+        try:
+            raw.send({"task": "study", "curve": curve_name, "config": cfg.to_dict(),
+                      "message": message})
+            raw.set_format(cfg.wire)
+            sig, Q, total_ms = _alice_side(raw, cfg, pcurve, key, msg, rec, mark_recv=True)
+            report = raw.recv()
+        finally:
+            raw.close()
+        if report.get("d2") is not None:
+            out["d2"] = int(report["d2"])
+        for e in rec.events:
+            e["t"] = (e["t"] - rec.t0) * 1000
+        for e in report["events"]:
+            e["remote"] = True
+        events = merge(rec.events, report["events"])
+        for i, e in enumerate(events):
+            e["t"] = i        # order only; the two clocks are not comparable
     # Verification: normal ECDSA, with the chosen curve variant.
     t1 = time.perf_counter()
     if cfg.curve == "libsecp256k1":
@@ -232,13 +331,14 @@ def study(cfg: Config, curve_name: str = "toy", message: str = "Alice and Bob se
         valid = ecdsa_baseline.verify(PublicKey.from_point(*Q), msg, sig)
     else:
         valid = ecdsa_pure.verify(curve, Q, msg, sig)
-    rec.add("verifier", "step", step="verify: anyone checks (r, s) against Q", rows=["curve"],
-            values=_jsonable({"r": sig[0], "s": sig[1], "Q": Q, "valid": valid}))
-    rec.events[-1]["spent_ms"] = round((time.perf_counter() - t1) * 1000, 3)
-    events = sorted(rec.events, key=lambda e: e["t"])
+    events.append({"t": events[-1]["t"] if events else 0, "party": "verifier", "kind": "step",
+                   "step": "verify: anyone checks (r, s) against Q", "rows": ["curve"],
+                   "values": _jsonable({"r": sig[0], "s": sig[1], "Q": Q, "valid": valid}),
+                   "spent_ms": round((time.perf_counter() - t1) * 1000, 3)})
     t_first = events[0]["t"] if events else 0
     for i, e in enumerate(events):
-        e["at_ms"] = round((e.pop("t") - t_first) * 1000, 3)
+        t = e.pop("t")
+        e["at_ms"] = None if peer else round((t - t_first) * 1000, 3)
         e["index"] = i
     stolen = None
     if not cfg.mask:
@@ -253,6 +353,7 @@ def study(cfg: Config, curve_name: str = "toy", message: str = "Alice and Bob se
     return {
         "config": cfg.to_dict(), "label": cfg.label(), "curve": curve_name,
         "curve_bits": curve.n.bit_length(), "message": message,
+        "bob": f"{partner} ({peer[0]})" if peer else "this laptop",
         "signature": _jsonable(sig), "public_key": _jsonable(Q), "valid": valid,
         "total_ms": round(total_ms, 3), "messages": len(sign_msgs),
         "signing_messages": len(sign_msgs) - 2,   # 2 belong to the setup

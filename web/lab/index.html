@@ -25,6 +25,38 @@ benchmark mode runs many signatures and measures them. Alice and Bob are real pr
   </select></label>
 </form>
 
+<section id="pair">
+  <h2>Partner on the same Wi-Fi</h2>
+  <p class="line">
+    <label class="inline"><input type="radio" name="pairmode" value="alone" checked> alone: Alice and Bob on this laptop</label>
+    <label class="inline"><input type="radio" name="pairmode" value="host"> be Bob for a partner</label>
+    <label class="inline"><input type="radio" name="pairmode" value="join"> join a partner as Alice</label>
+  </p>
+  <div id="pair-host" hidden>
+    <p>Pairing code: <span id="pair-code" class="code">----</span>
+      <span class="note">Tell it to your partner. This laptop: <code id="pair-me"></code></span></p>
+    <table id="pair-log" class="grid">
+      <thead><tr><th>Time</th><th>From</th><th>What</th></tr></thead>
+      <tbody><tr><td colspan="3" class="note">no session yet</td></tr></tbody>
+    </table>
+    <div id="bob-last" hidden>
+      <h3>What this laptop did as Bob in the last signature</h3>
+      <p id="bob-last-info" class="note"></p>
+      <div class="scroll">
+        <table id="bob-steps" class="grid timeline">
+          <thead><tr><th>#</th><th>Step</th><th>Time</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <form id="pair-join" class="line" hidden>
+    <label>Code <input id="join-code" type="text" inputmode="numeric" maxlength="4" size="5" autocomplete="off"></label>
+    <button type="submit" id="join-run">Connect</button>
+  </form>
+  <p id="pair-status" class="status" role="status"></p>
+</section>
+
 <div class="cols">
 <div class="col-left">
   <h2>Building blocks</h2>

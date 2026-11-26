@@ -22,7 +22,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import lab
+from . import lab, pairing
 
 WEB = lab.ROOT / "web"
 JOBS: dict[str, lab.Job] = {}
@@ -72,6 +72,8 @@ class Handler(BaseHTTPRequestHandler):
     # ---- routes
     def do_GET(self):
         path = self.path.split("?", 1)[0]
+        if path == "/api/pair":
+            return self._json(pairing.PAIRING.status())
         if path == "/api/rows":
             return self._json({"rows": lab.rows(), "curves": lab.curves()})
         if path.startswith("/api/events/"):
@@ -94,15 +96,29 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         try:
             body = self._body()
+            if path == "/api/pair/host":
+                return self._json(pairing.PAIRING.host(body.get("name", "")))
+            if path == "/api/pair/join":
+                try:
+                    return self._json(pairing.PAIRING.join(str(body.get("code", ""))))
+                except LookupError as exc:
+                    return self._json({"error": str(exc)}, HTTPStatus.NOT_FOUND)
+                except OSError as exc:
+                    return self._json({"error": f"found the partner but could not connect: {exc}"},
+                                      HTTPStatus.BAD_GATEWAY)
+            if path == "/api/pair/leave":
+                return self._json(pairing.PAIRING.stop())
             curve = body.get("curve", "toy")
             cfg = lab.make_config(body.get("config"), curve)
+            peer, partner = pairing.PAIRING.bob()
             if path == "/api/study":
                 return self._json(lab.study(cfg, curve, body.get("message") or
-                                            "Alice and Bob send 1 coin to Carol"))
+                                            "Alice and Bob send 1 coin to Carol",
+                                            peer=peer, partner=partner))
             if path == "/api/auto":
                 rounds = max(1, min(int(body.get("rounds", 10)), 1000))
                 configs = lab.configs_for(body.get("kind", "current"), cfg, curve)
-                job = lab.Job(configs, curve, rounds, lab.parse_peer(body.get("peer"))).start()
+                job = lab.Job(configs, curve, rounds, lab.parse_peer(body.get("peer")) or peer).start()
                 jid = uuid.uuid4().hex[:12]
                 JOBS[jid] = job
                 return self._json({"job": jid, "configs": [c.label() for c in configs]})
@@ -160,6 +176,7 @@ def serve(host="127.0.0.1", port=8765, open_browser=True) -> int:
         pass
     finally:
         lab.LOCAL_BOB.stop()
+        pairing.PAIRING.stop()
         srv.server_close()
     return 0
 

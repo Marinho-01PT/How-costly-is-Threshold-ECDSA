@@ -22,8 +22,10 @@ HSG Bachelor project, supervised by Prof. Katerina Mitrokotsa and Nan Cheng.
 | Experiment: Bob leaves out β' in MtA, Alice learns his key share | done in code and tests |
 | Benchmark of two-party signing | `--task sign` with any combination of building blocks, `--task matrix` for all of them |
 | Building blocks: libsecp256k1 in the protocol, gmpy2, Paillier CRT decryption and encryption, precomputed r^N, 3072-bit key, binary messages (`config.py`) | done, every variant tested to give a valid signature |
-| Building blocks: MtA reuse, batched messages, two devices over Wi-Fi | open |
+| Building blocks: MtA reuse, batched messages | done |
+| Two laptops on the same Wi-Fi: pairing code, in the terminal demo and in the web lab | done, tested on one machine so far |
 | Interface with one row per building block, study and benchmark mode (`python -m twoparty ui`) | done |
+| Pairing in the web lab: one laptop is Bob, the other joins with the 4-digit code | done |
 | Terminal demo: Alice, Bob and an observer, study mode, event log (`demo.py`) | done |
 | Demo UI for MtA and two-party signing, experiment in the visualizer | open |
 
@@ -91,6 +93,16 @@ If nothing is found, the program says what to check:
 - As a fallback, type the address the host printed (`--hub IP:5050` or `--peer IP:5050`).
 
 The code only prevents connecting to the wrong laptop. It is not a password: anyone on the network can read the beacons.
+
+### In the web lab
+
+Both run `python -m twoparty ui`. Under "Partner on the same Wi-Fi", one
+picks **be Bob for a partner** and reads out the 4-digit code; the other picks
+**join a partner as Alice** and types it. From then on study mode and benchmark
+mode on Alice's laptop use the partner as Bob. Bob's page lists every session
+and the steps Bob computed in the last signature, so both screens show their
+own half. In study mode Alice's page shows both halves, put in the order the
+messages force (the two clocks are not compared).
 
 ## Building-block lab (web interface)
 
