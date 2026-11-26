@@ -76,7 +76,7 @@ def test_config_rows():
     with pytest.raises(ValueError):
         Config(paillier_enc="magic")
     labels = [c.label() for c in config.variants_one_at_a_time()]
-    assert labels[0] == "original" and len(labels) == len(set(labels)) == 8
+    assert labels[0] == "original" and len(labels) == len(set(labels)) == 10
     assert Config.from_dict(config.fastest().to_dict()) == config.fastest()
 
 
@@ -135,5 +135,5 @@ def test_matrix_cli_on_toy_curve(tmp_path):
                      "--out", str(out)]) == 0
     rows = list(csv.DictReader(out.open()))
     assert rows[0]["config"] == "original"
-    assert all(float(r["sig_per_s"]) > 0 and float(r["msgs_per_sig"]) >= 14 for r in rows)
+    assert all(float(r["sig_per_s"]) > 0 and float(r["msgs_per_sig"]) >= 4 for r in rows)
     assert any(r["wire"] == "binary" for r in rows)

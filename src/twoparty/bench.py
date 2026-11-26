@@ -98,7 +98,8 @@ def sign_alice(channel, curve, rounds: int, cfg: Config | None = None,
         key = paillier.keygen(paillier_bits(curve, cfg))
         keygen_ms = _ms(t0)
     t0 = time.perf_counter()
-    key, d1, Q = protocol.setup_alice(channel, pcurve, key=key)
+    reuse, batched = cfg.mta == "reuse", cfg.flow == "batched"
+    key, d1, Q = protocol.setup_alice(channel, pcurve, key=key, reuse=reuse)
     setup_ms = _ms(t0)
     if old_call:
         setup_ms += keygen_ms
@@ -114,7 +115,8 @@ def sign_alice(channel, curve, rounds: int, cfg: Config | None = None,
         msg = f"tx-{i}".encode()
         before = channel.stats()
         t0 = time.perf_counter()
-        sig = protocol.sign_alice(channel, pcurve, key, d1, msg, ops=ops)
+        sig = protocol.sign_alice(channel, pcurve, key, d1, msg, ops=ops,
+                                  reuse=reuse, batched=batched)
         sign_ms.append(_ms(t0))
         after = channel.stats()
         msgs.append(after["sent_msgs"] + after["recv_msgs"] - before["sent_msgs"] - before["recv_msgs"])
@@ -147,7 +149,12 @@ def sign_bob(channel, curve, cfg: Config | None = None, rounds: int = 0) -> None
     """Sign tx-0, tx-1, ... with Alice until she disconnects."""
     cfg = cfg or Config()
     pcurve = ec_libsecp.resolve(curve, cfg.curve)
-    N, d2, _ = protocol.setup_bob(channel, pcurve)
+    reuse, batched = cfg.mta == "reuse", cfg.flow == "batched"
+    c_d1 = None
+    if reuse:
+        N, d2, _, c_d1 = protocol.setup_bob(channel, pcurve, reuse=True)
+    else:
+        N, d2, _ = protocol.setup_bob(channel, pcurve)
     ops = paillier.ops_for(cfg, N)
     t0 = time.perf_counter()
     if cfg.paillier_enc == "precomputed":
@@ -157,7 +164,8 @@ def sign_bob(channel, curve, cfg: Config | None = None, rounds: int = 0) -> None
     try:
         while True:
             protocol.sign_bob(channel, pcurve, N, d2, f"tx-{i}".encode(),
-                              mask=cfg.mask, ops=ops)
+                              mask=cfg.mask, ops=ops, reuse=reuse, batched=batched,
+                              c_d1=c_d1)
             i += 1
     except ConnectionError:
         pass

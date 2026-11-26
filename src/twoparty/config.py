@@ -11,9 +11,14 @@ we started with, so Config() is exactly the original protocol.
     paillier_bits size of N
     wire         how messages travel: JSON text or a compact binary format
     mask         True: normal MtA with beta'. False: the experiment without beta'
+    mta          "separate": every MtA sends its own Enc(a) (4 per signature).
+                 "reuse": Enc(d1) once at setup, Enc(k1) once per signature
+                 for both MtAs with k1. Alice sends 2 ciphertexts instead of 4.
+    flow         "sequential": one message per step (14 per signature).
+                 "batched": everything that can travel together does (4).
 
-Still planned (see ROWS, "planned"): MtA reuse, batched messages, two devices
-over Wi-Fi. The network row is chosen by where Bob runs, not here.
+The network row (localhost, Docker, two devices over Wi-Fi) is chosen by
+where Bob runs, not here.
 """
 from dataclasses import asdict, dataclass, fields, replace
 
@@ -27,8 +32,8 @@ ROWS = [
     ("paillier_bits", "Paillier key size", [2048, 3072], []),
     ("wire", "Message format", ["json", "binary"], []),
     ("mask", "Safety experiment (beta' in MtA)", [True, False], []),
-    ("mta", "Use of MtA", ["4 separate"], ["Enc(d1) once, Enc(k1) reused"]),
-    ("flow", "Message flow", ["14 messages"], ["batched (4)"]),
+    ("mta", "Use of MtA", ["separate", "reuse"], []),
+    ("flow", "Message flow", ["sequential", "batched"], []),
 ]
 
 LABELS = {
@@ -38,6 +43,8 @@ LABELS = {
     "precomputed": "precomputed r^N (offline/online)",
     "json": "JSON, decimal text", "binary": "binary",
     True: "with beta'", False: "without beta' (key share leaks)",
+    "separate": "4 separate MtAs", "reuse": "Enc(d1) once, Enc(k1) reused",
+    "sequential": "one message per step (14)", "batched": "batched (4)",
 }
 
 
@@ -50,6 +57,8 @@ class Config:
     paillier_bits: int = 2048
     wire: str = "json"
     mask: bool = True
+    mta: str = "separate"
+    flow: str = "sequential"
 
     def __post_init__(self):
         for name, _, variants, _ in ROWS:
@@ -99,4 +108,4 @@ def variants_one_at_a_time() -> list[Config]:
 def fastest() -> Config:
     """Every speed-up together (2048-bit key, as advised)."""
     return Config(curve="libsecp256k1", bignum="gmpy2", paillier_dec="crt",
-                  paillier_enc="precomputed", wire="binary")
+                  paillier_enc="precomputed", wire="binary", mta="reuse", flow="batched")
