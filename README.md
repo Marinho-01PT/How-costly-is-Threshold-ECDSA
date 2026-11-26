@@ -64,6 +64,34 @@ together, and writes one CSV row each to `benchmark/results/`: signing time
 (mean, median, p95), signatures per second, verification time, messages and
 bytes per signature, and setup and offline time apart.
 
+## Two laptops on the same Wi-Fi
+
+No IP addresses to type: one laptop hosts and prints a 4-digit pairing code,
+the other joins with it (`src/twoparty/lan.py`, UDP broadcast on port 5051).
+
+**Demo** (each person sees their own side, step by step):
+```bash
+python -m twoparty lan --name Bruno          # laptop 1: asks mode/pace/experiment, prints e.g. "Pairing code: 4821"
+python -m twoparty lan --code 4821           # laptop 2: finds laptop 1, plays Alice
+```
+Laptop 1 runs the observer as a quiet relay plus Bob; `--as alice` swaps the
+roles, `--show-network` also prints the network view there. Pace `all` means
+Enter on both laptops. The three-terminal setup with `--hub` still works.
+
+**Benchmark** between two laptops:
+```bash
+python -m twoparty --role bob --lan                          # laptop 1, prints a code
+python -m twoparty --task matrix --lan --code 4821 --label wifi   # laptop 2
+```
+
+If nothing is found, the program says what to check:
+- Both laptops must be on the same network, without VPN.
+- macOS asks once whether Python may accept incoming connections: click Allow.
+- University and guest networks (eduroam) often block traffic between devices. Use a phone hotspot instead.
+- As a fallback, type the address the host printed (`--hub IP:5050` or `--peer IP:5050`).
+
+The code only prevents connecting to the wrong laptop. It is not a password: anyone on the network can read the beacons.
+
 ## Run it
 
 The code is the same everywhere. Only the address of the other party changes.

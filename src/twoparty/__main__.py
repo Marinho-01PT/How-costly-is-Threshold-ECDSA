@@ -12,6 +12,13 @@ Building blocks (see config.py), one --set per row that differs from the origina
 Benchmark matrix: the original, every variant on its own, all speed-ups together.
 Starts its own Bob on localhost unless --peer is given:
   python -m twoparty --task matrix --rounds 10
+
+Two laptops on the same Wi-Fi (no addresses, see lan.py):
+  python -m twoparty lan                                  # the demo: host, prints a code
+  python -m twoparty lan --code 4821                      # the demo: join
+  python -m twoparty --role bob --lan                     # benchmark: Bob, prints a code
+  python -m twoparty --role alice --task sign --lan --code 4821
+  python -m twoparty --task matrix --lan --code 4821
 """
 import argparse
 import datetime
@@ -23,7 +30,7 @@ import sys
 import time
 from dataclasses import replace
 
-from . import bench, config, net, paillier
+from . import bench, config, lan, net, paillier
 from .config import Config
 from .ec import CURVES
 
@@ -34,6 +41,11 @@ def addr(text: str) -> tuple[str, int]:
 
 
 def main(argv=None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] in (["lan"], ["demo"]):  # python -m twoparty lan ... = the demo over Wi-Fi
+        from . import demo
+        rest = argv[1:]
+        return demo.main(rest if argv[0] == "demo" else ["lan", *rest])
     p = argparse.ArgumentParser(prog="twoparty")
     p.add_argument("--role", choices=["alice", "bob"])
     p.add_argument("--listen", help="host:port to wait on (Bob)")
@@ -48,6 +60,12 @@ def main(argv=None) -> int:
     p.add_argument("--label", default="unlabelled", help="name of the variant, e.g. docker-50ms")
     p.add_argument("--out", help="append the result to this CSV file")
     p.add_argument("--once", action="store_true", help="Bob: serve one connection, then exit")
+    p.add_argument("--lan", action="store_true",
+                   help="find the other laptop on this Wi-Fi: Bob announces a code, Alice uses --code")
+    p.add_argument("--code", help="--lan: the pairing code (Bob: optional, else a new one)")
+    p.add_argument("--timeout", type=float, default=30.0, help="--lan: seconds Alice searches")
+    p.add_argument("--beacon-port", type=int, default=lan.BEACON_PORT, help=argparse.SUPPRESS)
+    p.add_argument("--beacon-addr", help=argparse.SUPPRESS)  # tests: send beacons here only
     a = p.parse_args(argv)
 
     if a.task == "baseline":
@@ -63,10 +81,22 @@ def main(argv=None) -> int:
 
 
 def run_bob(a) -> int:
+    beacon = None
+    if a.lan:
+        a.listen = a.listen or "0.0.0.0:5050"
     if not a.listen:
-        sys.exit("Bob needs --listen host:port")
+        sys.exit("Bob needs --listen host:port (or --lan)")
     srv = net.listen(*addr(a.listen))
     print(f"bob: listening on {a.listen}", flush=True)
+    if a.lan:
+        code = a.code or lan.new_code()
+        port = srv.getsockname()[1]
+        beacon = lan.Beacon(code, "bench", port, role="alice",
+                            targets=[a.beacon_addr] if a.beacon_addr else None,
+                            beacon_port=a.beacon_port).start()
+        print(f"bob: pairing code {code}, this laptop is {lan.local_ip()}:{port}\n"
+              f"     on the other laptop: python -m twoparty --task matrix --lan --code {code}",
+              flush=True)
     while True:
         ch = net.accept(srv)
         hello = ch.recv()
@@ -105,9 +135,23 @@ def sign_session(peer: tuple[str, int], curve: str, rounds: int, cfg: Config,
         ch.close()
 
 
+def find_peer(a) -> None:
+    """--lan --code: look for Bob's beacon and set a.peer."""
+    if not a.code:
+        sys.exit("--lan needs --code (the code Bob printed)")
+    print(f"# looking for Bob with code {a.code} (up to {a.timeout:.0f} s) ...", flush=True)
+    found = lan.find(a.code, "bench", a.timeout, a.beacon_port)
+    if found is None:
+        sys.exit(lan.HINT.replace("--hub", "--peer"))
+    a.peer = f"{found['host']}:{found['port']}"
+    print(f"# found Bob at {a.peer}", flush=True)
+
+
 def run_alice(a) -> int:
+    if a.lan and not a.peer:
+        find_peer(a)
     if not a.peer:
-        sys.exit("Alice needs --peer host:port")
+        sys.exit("Alice needs --peer host:port (or --lan --code CODE)")
     if a.task == "sign":
         row = sign_session(addr(a.peer), a.curve, a.rounds, parse_sets(a.set))
         report_row(a, row)
@@ -139,6 +183,8 @@ def run_matrix(a) -> int:
         k, _, v = item.partition("=")
         configs = [c for c in configs if str(getattr(c, k)).lower() == v.lower()]
     bob = None
+    if a.lan and not a.peer:
+        find_peer(a)
     if a.peer:
         peer = addr(a.peer)
     else:
